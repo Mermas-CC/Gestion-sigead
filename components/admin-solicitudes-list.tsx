@@ -57,11 +57,17 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
     const fetchSolicitudes = async () => {
       try {
         const res = await fetch("/api/admin/solicitudes")
-        const { solicitudes } = await res.json()
-        if (Array.isArray(solicitudes)) {
-          setSolicitudes(solicitudes)
+        if (!res.ok) {
+          const errorData = await res.json()
+          console.error("Error al obtener solicitudes:", errorData.message || "Respuesta no OK")
+          return
+        }
+
+        const data = await res.json()
+        if (Array.isArray(data.solicitudes)) {
+          setSolicitudes(data.solicitudes)
         } else {
-          console.error("Los datos recibidos no son un array", solicitudes)
+          console.error("Los datos recibidos no son un array", data.solicitudes)
         }
       } catch (error) {
         console.error("Error al cargar solicitudes:", error)
@@ -98,7 +104,7 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "aprobada":
-        return <Badge className="bg-green-500">Aprobada</Badge>
+        return <Badge className="bg-green-500 text-white">Aprobada</Badge>
       case "rechazada":
         return <Badge variant="destructive">Rechazada</Badge>
       case "pendiente":
@@ -123,7 +129,6 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
 
       if (!res.ok) throw new Error("Error actualizando solicitud")
 
-      // Actualiza localmente
       setSolicitudes((prev) =>
         prev.map((s) =>
           s.id === selectedSolicitud.id
@@ -139,6 +144,11 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handleCloseDialog = () => {
+    setSelectedSolicitud(null)
+    setComentarios("")
   }
 
   return (
@@ -206,7 +216,7 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
         </Table>
       </div>
 
-      <Dialog open={!!selectedSolicitud} onOpenChange={() => setSelectedSolicitud(null)}>
+      <Dialog open={!!selectedSolicitud} onOpenChange={handleCloseDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Detalles de la Solicitud</DialogTitle>
@@ -235,7 +245,7 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
                 </div>
               </div>
               <div>
-                <h4 className="text-sm font-medium">Tipo de Permiso</h4>
+                <h4 className="text-sm font-medium">Tipo de Solicitud</h4>
                 <p className="text-sm">{selectedSolicitud.tipo}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
