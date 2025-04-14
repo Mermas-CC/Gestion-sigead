@@ -23,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { CheckCircle, Eye, Search, XCircle } from "lucide-react"
+import { CheckCircle, Eye, Search, XCircle, FileText } from "lucide-react"
 
 interface Usuario {
   id: number
@@ -40,6 +40,7 @@ interface Solicitud {
   estado: string
   comentarios: string
   fechaSolicitud: string
+  contratoUrl: string | null
 }
 
 interface AdminSolicitudesListProps {
@@ -188,7 +189,7 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
             ) : (
               filteredSolicitudes.map((solicitud) => (
                 <TableRow key={solicitud.id}>
-                  <TableCell className="font-medium">{solicitud.id}</TableCell>
+                  <TableCell className="font-medium">{solicitud.numeroExpediente}</TableCell>
                   <TableCell>{solicitud.usuario?.nombre || "Sin nombre"}</TableCell>
                   <TableCell>{solicitud.usuario?.departamento || "Sin departamento"}</TableCell>
                   <TableCell>{solicitud.tipo}</TableCell>
@@ -208,6 +209,18 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
                       <Eye className="h-4 w-4" />
                       <span className="sr-only">Ver detalles</span>
                     </Button>
+                    {/* Agregar botón para ver contrato si existe */}
+                    {solicitud.contratoUrl && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="ml-2"
+                        onClick={() => window.open(solicitud.contratoUrl, "_blank")}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Ver contrato
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -282,19 +295,4 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
                 disabled={isProcessing}
               >
                 <XCircle className="mr-2 h-4 w-4" />
-                Rechazar
-              </Button>
-              <Button
-                onClick={() => updateSolicitudEstado("aprobada")}
-                disabled={isProcessing}
-              >
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Aprobar
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
-    </Card>
-  )
-}
+                Rechazar </Button> <Button onClick={() => updateSolicitudEstado("aprobada")} disabled={isProcessing}> <CheckCircle className="mr-2 h-4 w-4" /> Aprobar </Button> </DialogFooter> )} </DialogContent> </Dialog> </Card> ) }

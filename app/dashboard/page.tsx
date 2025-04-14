@@ -2,6 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SolicitudesList } from "@/components/solicitudes-list"
 import { NuevaSolicitudButton } from "@/components/nueva-solicitud-button"
+
+
+import BotonSolicitudVacaciones from '@/components/BotonSolicitudVacaciones'
+
 import Link from "next/link"
 import { FileText, Clock, Send, Users } from "lucide-react"
 
@@ -11,6 +15,8 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Panel Principal</h1>
         <NuevaSolicitudButton />
+
+        <BotonSolicitudVacaciones />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">

@@ -25,27 +25,29 @@ export async function GET(request: Request) {
     // Query para obtener todas las solicitudes
     let sqlQuery = `
       SELECT 
-        s.id, 
-        s.numero_expediente, 
-        s.tipo, 
-        s.descripcion, 
-        s.fecha_inicio, 
-        s.fecha_fin,
-        s.estado, 
-        s.created_at, 
-        s.updated_at,
-        s.celular,
-        s.correo,
-        s.cargo,
-        s.institucion,
-        s.goce_remuneraciones,
-        s.comentarios,
-        s.archivo_url,
-        u.id as usuario_id, 
-        u.nombre as usuario_nombre, 
-        u.departamento as usuario_departamento
-      FROM solicitudes s
-      JOIN usuarios u ON s.usuario_id = u.id
+  s.id, 
+  s.numero_expediente, 
+  s.tipo, 
+  s.descripcion, 
+  s.fecha_inicio, 
+  s.fecha_fin,
+  s.estado, 
+  s.created_at, 
+  s.updated_at,
+  s.celular,
+  s.correo,
+  s.cargo,
+  s.institucion,
+  s.goce_remuneraciones,
+  s.comentarios,
+  s.archivo_url,
+  u.id as usuario_id, 
+  u.nombre as usuario_nombre, 
+  u.departamento as usuario_departamento,
+  u.contrato_url  -- Aquí agregas la ruta del contrato
+FROM solicitudes s
+JOIN usuarios u ON s.usuario_id = u.id
+
     `
 
     // Si se especifica un estado, filtrar por el estado
@@ -86,12 +88,14 @@ export async function GET(request: Request) {
       goceRemuneraciones: s.goce_remuneraciones,
       comentarios: s.comentarios,
       rutaAdjunto: s.archivo_url,
+      contratoUrl: s.contrato_url,  // Asegúrate de incluir el contrato URL
       usuario: {
         id: s.usuario_id,
         nombre: s.usuario_nombre,
         departamento: s.usuario_departamento,
       }
     }))
+    
 
     return NextResponse.json({ solicitudes })
 

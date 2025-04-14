@@ -76,13 +76,13 @@ export default function NewUserPage() {
     e.preventDefault()
     setIsLoading(true)
     setError("")
-
+  
     // Validar si es necesario el archivo de contrato
     if (formData.contractFile === null && formData.contractTypeId) {
       const selectedContractType = contractTypes.find(
         (contract) => contract.id === formData.contractTypeId
       )
-
+  
       if (selectedContractType && selectedContractType.name === "Contrato CAS") {
         setError("Debe adjuntar el archivo de contrato para este tipo de contrato")
         setIsLoading(false)
@@ -90,32 +90,56 @@ export default function NewUserPage() {
       }
     }
 
-    // Crear un objeto de datos para enviar como JSON
-    const dataToSend = {
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      department: formData.department || "",
-      role: formData.role || "user",
-      isActive: formData.isActive ? "true" : "false",
-      phone: formData.phone || "",
-      position: formData.position || "",
-      contractFile: formData.contractFile ? formData.contractFile.name : null, // solo el nombre del archivo
-      contractTypeId: formData.contractTypeId,
-      careerLevelId: formData.careerLevelId,
-    }
+    // // Crear un objeto de datos para enviar como JSON
+    // const dataToSend = {
+    //   name: formData.name,
+    //   email: formData.email,
+    //   password: formData.password,
+    //   department: formData.department || "",
+    //   role: formData.role || "user",
+    //   isActive: formData.isActive ? "true" : "false",
+    //   phone: formData.phone || "",
+    //   position: formData.position || "",
+    //   contractFile: formData.contractFile ? formData.contractFile.name : null, // solo el nombre del archivo
+    //   contractTypeId: formData.contractTypeId,
+    //   careerLevelId: formData.careerLevelId,
+    // }
+      // Crear FormData para envío con archivo
+  const body = new FormData()
+  body.append("name", formData.name)
+  body.append("email", formData.email)
+  body.append("password", formData.password)
+  body.append("department", formData.department || "")
+  body.append("role", formData.role || "user")
+  body.append("isActive", formData.isActive ? "true" : "false")
+  body.append("phone", formData.phone || "")
+  body.append("position", formData.position || "")
+  body.append("contractTypeId", formData.contractTypeId)
+  body.append("careerLevelId", formData.careerLevelId)
+  if (formData.contractFile) {
+    body.append("contractFile", formData.contractFile)
+  }
 
+    // try {
+    //   const response = await fetch("/api/admin/users", {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //     },
+    //     body: JSON.stringify(dataToSend), // Enviar como JSON
+    //   })
     try {
       const response = await fetch("/api/admin/users", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(dataToSend), // Enviar como JSON
+        body: body,
       })
 
       const data = await response.json()
 
+      if (!response.ok) {
+        throw new Error(data.message || "Error al crear el usuario")
+      }
+      
       if (!response.ok) {
         throw new Error(data.message || "Error al crear el usuario")
       }

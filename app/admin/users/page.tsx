@@ -3,28 +3,37 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Search, Edit, Trash2 } from "lucide-react"
+import { UserPlus, Search, Edit, Trash2, ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react" // opcional: ícono de volver
-
 import Link from "next/link"
 
 interface User {
   id: number
-  name: string
+  nombre: string
   email: string
-  role: string
-  department: string
-  status: string
+  departamento: string | null
+  rol: string
+  activo: boolean
+  telefono?: string | null
+  cargo?: string | null
+  contrato_url?: string | null
+  tipo_contrato_id?: string | null
+  nivel_carrera_id?: string | null
 }
 
 export default function UsersPage() {
   const router = useRouter()
-  const handleBack = () => {
-    router.back()
-  }
+  const handleBack = () => router.back()
+
   const [users, setUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(true)
@@ -34,10 +43,11 @@ export default function UsersPage() {
     const fetchUsers = async () => {
       try {
         const response = await fetch("/api/admin/users", {
-          credentials: "include", // Incluir cookies
+          credentials: "include",
         })
         if (!response.ok) {
-          throw new Error("Error al cargar usuarios")
+          const errorData = await response.json()
+          throw new Error(errorData.message || "Error al cargar usuarios")
         }
         const data = await response.json()
         setUsers(data.users || [])
@@ -52,11 +62,10 @@ export default function UsersPage() {
     fetchUsers()
   }, [])
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.department?.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredUsers = users.filter((user) =>
+    (user.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.departamento || "").toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   if (isLoading) {
@@ -70,12 +79,12 @@ export default function UsersPage() {
   return (
     <div className="container py-8">
       <div className="flex items-center justify-between mb-6">
-      <Button variant="ghost"  className="mb-4">
-        <Link href="/admin/dashboard">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver
-        </Link>
-      </Button>
+        <Button variant="ghost" className="mb-4">
+          <Link href="/admin/dashboard">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver
+          </Link>
+        </Button>
 
         <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
         <Button asChild>
@@ -121,17 +130,17 @@ export default function UsersPage() {
             ) : (
               filteredUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell className="font-medium">{user.nombre}</TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.department}</TableCell>
+                  <TableCell>{user.departamento || "-"}</TableCell>
                   <TableCell>
-                    <Badge variant={user.role === "admin" ? "default" : "outline"}>
-                      {user.role === "admin" ? "Administrador" : "Usuario"}
+                    <Badge variant={user.rol === "admin" ? "default" : "outline"}>
+                      {user.rol === "admin" ? "Administrador" : "Usuario"}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.status === "active" ? "success" : "destructive"}>
-                      {user.status === "active" ? "Activo" : "Inactivo"}
+                    <Badge variant={user.activo ? "success" : "destructive"}>
+                      {user.activo ? "Activo" : "Inactivo"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
