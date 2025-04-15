@@ -1,96 +1,185 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { getCurrentUser } from "@/lib/auth"; // Para la autenticación
+import type React from "react"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
+import { useRouter } from "next/navigation"
 
-interface NuevoReclamoButtonProps {
-  solicitudId: number;
-}
+export function NuevoReclamoButton() {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
+  const [archivo, setArchivo] = useState<File | null>(null)
+  const [formData, setFormData] = useState({
+    descripcion: "",
+  })
 
-export function NuevoReclamoButton({ solicitudId }: NuevoReclamoButtonProps) {
-  const [open, setOpen] = useState(false);
-  const [mensaje, setMensaje] = useState("");
-  const [archivo, setArchivo] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!mensaje.trim()) {
-      toast.error("El mensaje es obligatorio");
-      return;
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      if (file.size > 5 * 1024 * 1024) {
+        setError("El archivo no debe superar los 5MB")
+        return
+      }
+      setArchivo(file)
+      setError("")
     }
+  }
 
-    setLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError("")
 
     try {
-      const user = await getCurrentUser(); // Obtener usuario autenticado
-      if (!user) {
-        toast.error("No se pudo obtener el usuario.");
-        return;
+      if (!formData.descripcion) {
+        setError("La descripción es obligatoria")
+        setIsSubmitting(false)
+        return
       }
 
-      const formData = new FormData();
-      formData.append("solicitud_id", String(solicitudId));
-      formData.append("usuario_id", String(user.id));
-      formData.append("mensaje", mensaje);
-      if (archivo) formData.append("archivo", archivo);
+      let archivoUrl = null
 
-      const res = await fetch("/api/reclamos", {
+      if (archivo) {
+        const formDataFile = new FormData()
+        formDataFile.append("file", archivo)
+        formDataFile.append("tipo", "reclamo")
+
+        const fileResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: formDataFile,
+        })
+
+        if (!fileResponse.ok) {
+          throw new Error("Error al subir el archivo adjunto")
+        }
+
+        const fileData = await fileResponse.json()
+        archivoUrl = fileData.url  // Asignamos la URL del archivo a archivoUrl
+      }
+
+      // Crear cuerpo dinámico según si hay archivo_url
+      const body: any = {
+        descripcion: formData.descripcion,
+        estado: "pendiente",
+      }
+
+      // Solo incluir archivo_url si el archivo fue cargado
+      if (archivoUrl) {
+        body.archivo_url = archivoUrl
+      }
+
+      console.log("Enviando reclamo:", {
+        descripcion: formData.descripcion,
+        archivo_url: archivoUrl,
+        estado: "pendiente",
+      })
+      
+      // Enviar el reclamo
+      const response = await fetch("/api/reclamos", {
         method: "POST",
-        body: formData,
-      });
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
 
-      if (res.ok) {
-        toast.success("Reclamo enviado correctamente");
-        setOpen(false);
-        setMensaje("");
-        setArchivo(null);
-      } else {
-        toast.error("Error al enviar el reclamo");
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || "Error al registrar el reclamo")
       }
+
+      // Limpiar formulario y cerrar el modal
+      setFormData({ descripcion: "" })
+      setArchivo(null)
+      setOpen(false)
+      router.refresh()
     } catch (err) {
-      toast.error("Error en el servidor");
+      setError(err instanceof Error ? err.message : "Error al registrar el reclamo")
     } finally {
-      setLoading(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">Presentar Reclamo</Button>
+        <Button>
+          Registrar Reclamo
+        </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Nuevo Reclamo</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-2xl">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Registrar Reclamo</DialogTitle>
+            <DialogDescription>Completa el formulario para registrar tu reclamo.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-        <div className="space-y-4">
-          <div>
-            <Label>Mensaje del reclamo *</Label>
-            <Textarea
-              value={mensaje}
-              onChange={(e) => setMensaje(e.target.value)}
-              placeholder="Describe por qué estás presentando este reclamo"
-              required
-            />
+            <div className="grid gap-2">
+              <Label htmlFor="descripcion">Descripción del Reclamo</Label>
+              <Textarea
+                id="descripcion"
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                placeholder="Describe el motivo de tu reclamo"
+                className="min-h-[80px]"
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="archivo">Archivo Adjunto (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="archivo"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => document.getElementById("archivo")?.click()}
+                  className="w-full"
+                >
+                  {archivo ? archivo.name : "Seleccionar archivo"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Formatos permitidos: PDF, DOC, DOCX, JPG, PNG (máx. 5MB)</p>
+            </div>
           </div>
-
-          <div>
-            <Label>Archivo adjunto (opcional)</Label>
-            <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
-          </div>
-
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? "Enviando..." : "Enviar reclamo"}
-          </Button>
-        </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Enviando..." : "Registrar Reclamo"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

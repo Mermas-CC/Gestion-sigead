@@ -1,22 +1,41 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 import { SolicitudesList } from "@/components/solicitudes-list"
 import { NuevaSolicitudButton } from "@/components/nueva-solicitud-button"
+import { NuevoReclamoButton } from "@/components/nuevo-reclamo-button"
 
-
-import BotonSolicitudVacaciones from '@/components/BotonSolicitudVacaciones'
+import BotonSolicitudVacaciones from "@/components/BotonSolicitudVacaciones"
+import { ReclamosList } from "@/components/reclamo-list"
 
 import Link from "next/link"
-import { FileText, Clock, Send, Users } from "lucide-react"
+import {
+  FileText,
+  Clock,
+  Send,
+  Users,
+} from "lucide-react"
 
 export default function DashboardPage() {
   return (
     <div className="container py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Panel Principal</h1>
-        <NuevaSolicitudButton />
-
-        <BotonSolicitudVacaciones />
+        <div className="flex gap-2">
+          <NuevaSolicitudButton />
+          <NuevoReclamoButton />
+          <BotonSolicitudVacaciones />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -30,7 +49,9 @@ export default function DashboardPage() {
               <CardDescription>Licencias con goce de remuneraciones</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Incapacidad temporal, maternidad, estudios, etc.</p>
+              <p className="text-sm text-muted-foreground">
+                Incapacidad temporal, maternidad, estudios, etc.
+              </p>
             </CardContent>
           </Card>
         </Link>
@@ -45,7 +66,9 @@ export default function DashboardPage() {
               <CardDescription>Licencias sin goce de remuneraciones</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Motivos particulares, capacitación no oficial, etc.</p>
+              <p className="text-sm text-muted-foreground">
+                Motivos particulares, capacitación no oficial, etc.
+              </p>
             </CardContent>
           </Card>
         </Link>
@@ -60,7 +83,9 @@ export default function DashboardPage() {
               <CardDescription>Envío y seguimiento de solicitudes</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Gestiona tus solicitudes enviadas y su estado</p>
+              <p className="text-sm text-muted-foreground">
+                Gestiona tus solicitudes enviadas y su estado
+              </p>
             </CardContent>
           </Card>
         </Link>
@@ -75,19 +100,26 @@ export default function DashboardPage() {
               <CardDescription>Gestión de usuarios del sistema</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Administra los usuarios y sus permisos</p>
+              <p className="text-sm text-muted-foreground">
+                Administra los usuarios y sus permisos
+              </p>
             </CardContent>
           </Card>
         </Link>
       </div>
 
       <Tabs defaultValue="pendientes" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex flex-wrap gap-1">
           <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
           <TabsTrigger value="aprobadas">Aprobadas</TabsTrigger>
           <TabsTrigger value="rechazadas">Rechazadas</TabsTrigger>
           <TabsTrigger value="todas">Todas</TabsTrigger>
+          <TabsTrigger value="reclamos">Reclamos</TabsTrigger>
+          <TabsTrigger value="aprobados-reclamos">Reclamos Aprobados</TabsTrigger>
+          <TabsTrigger value="rechazados-reclamos">Reclamos Rechazados</TabsTrigger>
         </TabsList>
+
+        {/* Solicitudes */}
         <TabsContent value="pendientes">
           <SolicitudesList status="pendiente" />
         </TabsContent>
@@ -99,6 +131,17 @@ export default function DashboardPage() {
         </TabsContent>
         <TabsContent value="todas">
           <SolicitudesList />
+        </TabsContent>
+
+        {/* Reclamos */}
+        <TabsContent value="reclamos">
+          <ReclamosList status="pendiente" />
+        </TabsContent>
+        <TabsContent value="aprobados-reclamos">
+          <ReclamosList status="aprobado" />
+        </TabsContent>
+        <TabsContent value="rechazados-reclamos">
+          <ReclamosList status="rechazado" />
         </TabsContent>
       </Tabs>
     </div>
