@@ -38,8 +38,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Link href="/dashboard/con-goce">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+        
           <Card className="h-full transition-all hover:shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center text-lg">
@@ -54,9 +54,7 @@ export default function DashboardPage() {
               </p>
             </CardContent>
           </Card>
-        </Link>
 
-        <Link href="/dashboard/sin-goce">
           <Card className="h-full transition-all hover:shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center text-lg">
@@ -71,9 +69,7 @@ export default function DashboardPage() {
               </p>
             </CardContent>
           </Card>
-        </Link>
 
-        <Link href="/dashboard/solicitudes">
           <Card className="h-full transition-all hover:shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center text-lg">
@@ -88,24 +84,8 @@ export default function DashboardPage() {
               </p>
             </CardContent>
           </Card>
-        </Link>
 
-        <Link href="/admin/users">
-          <Card className="h-full transition-all hover:shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center text-lg">
-                <Users className="mr-2 h-5 w-5 text-purple-500" />
-                Usuarios
-              </CardTitle>
-              <CardDescription>Gestión de usuarios del sistema</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Administra los usuarios y sus permisos
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
+
       </div>
 
       <Tabs defaultValue="pendientes" className="space-y-6">

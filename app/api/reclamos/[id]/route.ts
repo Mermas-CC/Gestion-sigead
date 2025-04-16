@@ -11,11 +11,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const { id } = params
 
-    // Obtener el reclamo por su ID
-    const reclamoQuery = await query(
-      `SELECT * FROM reclamos WHERE id = $1`,
-      [id]
-    )
+    const reclamoQuery = await query(`SELECT * FROM reclamos WHERE id = $1`, [id])
 
     if (reclamoQuery.rowCount === 0) {
       return NextResponse.json({ message: "Reclamo no encontrado" }, { status: 404 })
@@ -29,6 +25,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       mensaje: reclamo.mensaje,
       archivoUrl: reclamo.archivo_url,
       estado: reclamo.estado,
+      respuesta: reclamo.respuesta,
       fechaCreacion: reclamo.created_at
     })
 
@@ -38,18 +35,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: { id: string } }) {
   try {
     const userCheck = await getCurrentUser(request)
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
-    const { id } = params
+    const { id } = context.params
     const data = await request.json()
 
-    // Verificar si se proporcionó al menos un campo válido para actualizar
-    const camposValidos = ['mensaje', 'estado']
+    // Campos válidos para actualizar
+    const camposValidos = ['respuesta', 'estado']
     const camposActualizar = Object.keys(data)
     const camposInvalidos = camposActualizar.filter(campo => !camposValidos.includes(campo))
 
@@ -59,13 +56,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }, { status: 400 })
     }
 
-    // Actualizar el reclamo con los nuevos datos
     const updateQuery = await query(
       `UPDATE reclamos
-       SET mensaje = COALESCE($1, mensaje), estado = COALESCE($2, estado)
+       SET respuesta = COALESCE($1, respuesta), estado = COALESCE($2, estado), updated_at = CURRENT_TIMESTAMP
        WHERE id = $3
-       RETURNING id, solicitud_id, mensaje, archivo_url, estado, created_at`,
-      [data.mensaje, data.estado, id]
+       RETURNING id, solicitud_id, mensaje, archivo_url, estado, respuesta, created_at`,
+      [data.respuesta, data.estado, id]
     )
 
     if (updateQuery.rowCount === 0) {
@@ -80,6 +76,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       mensaje: reclamoActualizado.mensaje,
       archivoUrl: reclamoActualizado.archivo_url,
       estado: reclamoActualizado.estado,
+      respuesta: reclamoActualizado.respuesta,
       fechaCreacion: reclamoActualizado.created_at
     })
 

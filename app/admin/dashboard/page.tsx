@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminSolicitudesList } from "@/components/admin-solicitudes-list"   
-// import { AdminSolicitudesList } from "@/components/admin-solicitudes-list"
+import AdminReclamosList from "@/components/admin-reclamos-list"
 import { UserPlus, Users, FileText, Clock } from "lucide-react"
 import Link from "next/link"
 import { query, testConnection } from "@/lib/db"
@@ -123,7 +123,9 @@ export default async function AdminDashboardPage() {
     return (
     <div className="container py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Panel de Administración</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold tracking-tight">Panel de Administración</h1>
+        </div>
         <div className="flex gap-4">
           <Button asChild>
             <Link href="/admin/users/new">
@@ -246,6 +248,7 @@ export default async function AdminDashboardPage() {
           <TabsTrigger value="rechazadas">Rechazadas</TabsTrigger>
           <TabsTrigger value="correccion">Requieren corrección</TabsTrigger>
           <TabsTrigger value="todas">Todas</TabsTrigger>
+          <TabsTrigger value="reclamos">Reclamos</TabsTrigger>
         </TabsList>
         <TabsContent value="pendientes">
           <AdminSolicitudesList status="pendiente" />
@@ -261,6 +264,9 @@ export default async function AdminDashboardPage() {
         </TabsContent>
         <TabsContent value="todas">
           <AdminSolicitudesList />
+        </TabsContent>
+        <TabsContent value="reclamos">
+          <AdminReclamosList />
         </TabsContent>
       </Tabs>
     </div>

@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Eye, FileText, Download } from "lucide-react"
+import { NuevoReclamoForm } from "./NuevoReclamoForm"
 
 interface Solicitud {
   id: number
@@ -55,6 +56,7 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedSolicitud, setSelectedSolicitud] = useState<Solicitud | null>(null);
+  const [reclamoSolicitudId, setReclamoSolicitudId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchSolicitudes = async () => {
@@ -82,14 +84,13 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
     fetchSolicitudes();
   }, [status]);
 
-  // Mostrar todas las solicitudes si showAll es verdadero, o solo las que cumplan el filtro de estado
   const filteredSolicitudes = showAll
     ? solicitudes
     : solicitudes.filter((s) => {
         if (status) {
-          return s.estado === status; // Filtrar por el estado proporcionado
+          return s.estado === status;
         }
-        return s.estado === "pendiente" || new Date(s.fechaFin) >= new Date(); // Filtro por fecha o pendiente
+        return s.estado === "pendiente" || new Date(s.fechaFin) >= new Date();
       });
 
   const formatDate = (dateString: string) => {
@@ -169,6 +170,15 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
     }
   };
 
+  const handleReclamoSuccess = (solicitudId: number) => {
+    setSolicitudes((prevSolicitudes) =>
+      prevSolicitudes.map((s) =>
+        s.id === solicitudId ? { ...s, estado: "reclamado" } : s
+      )
+    )
+    setReclamoSolicitudId(null)
+  }
+
   if (isLoading) return <div className="flex justify-center p-8">Cargando solicitudes...</div>;
   if (error) return <div className="flex justify-center p-8 text-red-500">{error}</div>;
 
@@ -196,34 +206,50 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSolicitudes.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-medium">{s.numeroExpediente || `SOL-${s.id}`}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <span>{getTipoLicencia(s.tipo)}</span>
-                          {getLicenciaBadge(s.tipo, s.goceRemuneraciones)}
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatDate(s.fechaSolicitud)}</TableCell>
-                      <TableCell>{formatDate(s.fechaInicio)} - {formatDate(s.fechaFin)}</TableCell>
-                      <TableCell>{getStatusBadge(s.estado)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => setSelectedSolicitud(s)}>
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver detalles</span>
-                          </Button>
-                          {s.rutaAdjunto && (
-                            <Button variant="ghost" size="icon" onClick={() => handleDownload(s.rutaAdjunto!)}>
-                              <Download className="h-4 w-4" />
-                              <span className="sr-only">Descargar adjunto</span>
+                  filteredSolicitudes.map((s) => {
+                    const puedeReclamar =
+                      s.estado === "rechazada" ||
+                      new Date(s.fechaSolicitud).getTime() + 3 * 24 * 60 * 60 * 1000 < Date.now();
+
+                    return (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.numeroExpediente || `SOL-${s.id}`}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <span>{getTipoLicencia(s.tipo)}</span>
+                            {getLicenciaBadge(s.tipo, s.goceRemuneraciones)}
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatDate(s.fechaSolicitud)}</TableCell>
+                        <TableCell>{formatDate(s.fechaInicio)} - {formatDate(s.fechaFin)}</TableCell>
+                        <TableCell>{getStatusBadge(s.estado)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => setSelectedSolicitud(s)}>
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">Ver detalles</span>
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            {s.rutaAdjunto && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="ml-2"
+                                onClick={() => window.open(s.rutaAdjunto, "_blank")}
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Ver contrato
+                              </Button>
+                            )}
+                            {puedeReclamar && (
+                              <Button variant="destructive" onClick={() => setReclamoSolicitudId(s.id)}>
+                                Reclamar
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -231,6 +257,7 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
         </CardContent>
       </Card>
 
+      {/* Modal de Detalles */}
       <Dialog open={!!selectedSolicitud} onOpenChange={() => setSelectedSolicitud(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -241,7 +268,6 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
           </DialogHeader>
           {selectedSolicitud && (
             <div className="space-y-4">
-              {/* Reutiliza renderDetalles si se desea modularizar */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h4 className="font-semibold text-sm">Estado</h4>
@@ -290,54 +316,37 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
                 <div>
                   <h4 className="font-semibold text-sm">Institución</h4>
                   <p>{selectedSolicitud.institucion}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold text-sm">Celular</h4>
-                  <p>{selectedSolicitud.celular}</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm">Correo</h4>
-                  <p>{selectedSolicitud.correo}</p>
-                </div>
-              </div>
-              {selectedSolicitud.usuario && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-semibold text-sm">Solicitante</h4>
-                    <p>{selectedSolicitud.usuario.nombre}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm">Departamento</h4>
-                    <p>{selectedSolicitud.usuario.departamento || "No especificado"}</p>
-                  </div>
-                </div>
-              )}
-              {selectedSolicitud.comentarios && (
-                <div>
-                  <h4 className="font-semibold text-sm">Comentarios</h4>
-                  <p>{selectedSolicitud.comentarios}</p>
-                </div>
-              )}
-              {selectedSolicitud.rutaAdjunto && (
-                <div>
-                  <h4 className="font-semibold text-sm">Documento Adjunto</h4>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownload(selectedSolicitud.rutaAdjunto!)}
-                    className="mt-2"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Descargar documento
-                  </Button>
-                </div>
-              )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-semibold text-sm">Comentarios</h4>
+              <p>{selectedSolicitud.comentarios || "Sin comentarios"}</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm">Adjunto</h4>
+              <p>{selectedSolicitud.rutaAdjunto ? "Archivo adjunto disponible" : "No hay adjunto"}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </DialogContent>
+  </Dialog>
+
+  {/* Modal de Reclamo */}
+  <Dialog open={!!reclamoSolicitudId} onOpenChange={() => setReclamoSolicitudId(null)}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Nuevo Reclamo</DialogTitle>
+      </DialogHeader>
+      {reclamoSolicitudId && (
+        <NuevoReclamoForm
+          solicitudId={reclamoSolicitudId}
+          onSuccess={() => handleReclamoSuccess(reclamoSolicitudId)}
+        />
+      )}
+    </DialogContent>
+  </Dialog>
+</div>
   );
 }

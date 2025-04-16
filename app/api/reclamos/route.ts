@@ -8,15 +8,13 @@ import path from "path"
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
-    const estado = url.searchParams.get("estado") || "pendiente" // Estado por defecto: 'pendiente'
+    const estado = url.searchParams.get("estado") || "pendiente"
 
-    // Verificar si el usuario está autenticado
     const userCheck = await getCurrentUser(request)
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
-    // Consultar reclamos con datos de solicitud
     const result = await query(
       `SELECT 
          r.*, 
@@ -58,8 +56,8 @@ export async function POST(request: Request) {
     let data: any = {}
     let archivoUrl: string | null = null
 
-    const contentType = request.headers.get('content-type') || ''
-    if (contentType.includes('application/json')) {
+    const contentType = request.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
       data = await request.json()
       if (data.archivo_url) {
         archivoUrl = data.archivo_url

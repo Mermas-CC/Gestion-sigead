@@ -41,6 +41,7 @@ interface Solicitud {
   comentarios: string
   fechaSolicitud: string
   contratoUrl: string | null
+  rutaAdjunto: string | null
 }
 
 interface AdminSolicitudesListProps {
@@ -219,6 +220,18 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
                       >
                         <FileText className="h-4 w-4 mr-2" />
                         Ver contrato
+                      </Button>
+                    )}
+                    {/* Botón para abrir el archivo adjunto si existe */}
+                    {solicitud.rutaAdjunto && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="ml-2"
+                        onClick={() => window.open(solicitud.rutaAdjunto.startsWith("/uploads/") ? solicitud.rutaAdjunto : `/uploads/${solicitud.rutaAdjunto}`, "_blank")}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Ver archivo
                       </Button>
                     )}
                   </TableCell>
