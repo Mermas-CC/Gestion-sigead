@@ -68,6 +68,29 @@ export default function UsersPage() {
     (user.departamento || "").toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const handleEdit = (userId: number) => {
+    router.push(`/admin/users/${userId}`)
+  }
+
+  const handleDelete = async (userId: number) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.")) {
+      return
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.message || "Error al eliminar usuario")
+      }
+      setUsers((prev) => prev.filter((u) => u.id !== userId))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error al eliminar usuario")
+    }
+  }
+
   if (isLoading) {
     return <div className="flex justify-center p-8">Cargando usuarios...</div>
   }
@@ -145,13 +168,11 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/users/${user.id}`}>
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Editar</span>
-                        </Link>
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(user.id)}>
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Editar</span>
                       </Button>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(user.id)}>
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Eliminar</span>
                       </Button>

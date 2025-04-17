@@ -1,0 +1,17 @@
+{
+  "id": 43,
+  "numeroExpediente": "EXP-2025-0005",
+  "tipo": "vacaciones",
+  "motivo": "Vacaciones solicitadas",
+  "fechaInicio": "2025-04-11T05:00:00.000Z",
+  "fechaFin": "2025-04-19T05:00:00.000Z",
+  "estado": "aprobada",
+  "fechaSolicitud": "2025-04-16T15:26:42.320Z",
+  "fechaActualizacion": "2025-04-16T15:47:29.539Z",
+  "celular": "llllllllll",
+  "correo": "lllllllll@lll",
+  "cargo": "llllllllll",
+  "institucion": "llllllllll",
+  "goceRemuneraciones": true,
+  "comentarios": "aña uwu"
+}

@@ -130,6 +130,10 @@ export function ReclamosList({ status, showAll = false }: ReclamosListProps) {
 
   return (
     <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <Badge className="bg-purple-600 text-white">Reclamo</Badge>
+        <span className="font-semibold text-lg">Lista de Reclamos</span>
+      </div>
       <Card>
         <CardContent>
           <div className="rounded-md border">

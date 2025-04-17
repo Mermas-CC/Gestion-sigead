@@ -243,12 +243,24 @@ export default async function AdminDashboardPage() {
 
       <Tabs defaultValue="pendientes" className="space-y-6">
         <TabsList>
+          {/* Sección de Licencias/Solicitudes */}
+          <span className="flex items-center gap-2 mr-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-semibold">Licencias</span>
+          </span>
           <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
           <TabsTrigger value="aprobadas">Aprobadas</TabsTrigger>
           <TabsTrigger value="rechazadas">Rechazadas</TabsTrigger>
           <TabsTrigger value="correccion">Requieren corrección</TabsTrigger>
           <TabsTrigger value="todas">Todas</TabsTrigger>
-          <TabsTrigger value="reclamos">Reclamos</TabsTrigger>
+          {/* Separador visual */}
+          <span className="mx-2 border-l h-6 border-gray-300"></span>
+          {/* Sección de Reclamos */}
+          <span className="flex items-center gap-2 mr-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-semibold">Reclamos</span>
+          </span>
+          <TabsTrigger value="reclamos">
+            Reclamos
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="pendientes">
           <AdminSolicitudesList status="pendiente" />

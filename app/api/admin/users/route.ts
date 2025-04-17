@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db/postgres";
-import { verifyAdmin } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -17,15 +16,9 @@ export async function GET() {
   }
 }
 
-// POST: Crear nuevo usuario
+// POST: Crear nuevo usuario (registro público o admin)
 export async function POST(request: Request) {
   try {
-    // Verificar que el usuario sea un admin
-    const adminCheck = await verifyAdmin(request);
-    if (!adminCheck.success) {
-      return NextResponse.json({ message: adminCheck.message }, { status: adminCheck.status });
-    }
-
     // Procesar formulario multipart/form-data
     const formData = await request.formData();
 
@@ -34,8 +27,9 @@ export async function POST(request: Request) {
     const email = formData.get("email")?.toString() || "";
     const password = formData.get("password")?.toString() || "";
     const department = formData.get("department")?.toString() || null;
-    const role = formData.get("role")?.toString() || "user";
-    const isActive = formData.get("isActive") === "true";
+    // Si viene desde el panel admin, puede venir el rol y activo, si no, por defecto
+    const role = (formData.get("role")?.toString() || "user").toLowerCase();
+    const isActive = formData.has("isActive") ? formData.get("isActive") === "true" : true;
     const phone = formData.get("phone")?.toString() || null;
     const position = formData.get("position")?.toString() || null;
     const contractTypeId = formData.get("contractTypeId")?.toString() || "";
@@ -100,7 +94,8 @@ export async function POST(request: Request) {
         email,
         hashedPassword,
         department,
-        role,
+        // Si el registro es público, siempre "user"
+        role === "admin" ? "admin" : "user",
         isActive,
         phone,
         position,

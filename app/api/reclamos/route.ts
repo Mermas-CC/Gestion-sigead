@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { query } from "@/lib/db/postgres"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
+import { PDFDocument, StandardFonts } from "pdf-lib"
 
 // Endpoint para obtener reclamos
 export async function GET(request: Request) {
@@ -16,13 +17,19 @@ export async function GET(request: Request) {
     }
 
     const result = await query(
-      `SELECT 
-         r.*, 
-         s.numero_expediente AS solicitud_numero_expediente
-       FROM reclamos r
-       LEFT JOIN solicitudes s ON r.solicitud_id = s.id
-       WHERE r.estado = $1
-       ORDER BY r.created_at DESC`,
+      `
+        SELECT 
+          r.*, 
+          s.numero_expediente AS solicitud_numero_expediente,
+          s.tipo AS solicitud_tipo,
+          s.fecha_inicio AS solicitud_fecha_inicio,
+          s.fecha_fin AS solicitud_fecha_fin,
+          s.estado AS solicitud_estado
+        FROM reclamos r
+        LEFT JOIN solicitudes s ON r.solicitud_id = s.id
+        WHERE r.estado = $1
+        ORDER BY r.created_at DESC
+      `,
       [estado]
     )
 
@@ -34,7 +41,11 @@ export async function GET(request: Request) {
       reclamos: result.rows.map(r => ({
         ...r,
         solicitud: {
-          numeroExpediente: r.solicitud_numero_expediente
+          numeroExpediente: r.solicitud_numero_expediente,
+          tipo: r.solicitud_tipo,
+          fechaInicio: r.solicitud_fecha_inicio,
+          fechaFin: r.solicitud_fecha_fin,
+          estado: r.solicitud_estado,
         }
       }))
     })
@@ -178,5 +189,185 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Error al registrar reclamo:", error)
     return NextResponse.json({ message: "Error en el servidor", error: error.message }, { status: 500 })
+  }
+}
+
+// Endpoint para actualizar un reclamo
+export async function PATCH(request: Request) {
+  try {
+    const userCheck = await getCurrentUser(request);
+    if (!userCheck.success) {
+      return NextResponse.json({ message: userCheck.message }, { status: userCheck.status });
+    }
+
+    const { id, estado, respuesta, solicitudId } = await request.json();
+
+    let result;
+    if (typeof solicitudId !== "undefined") {
+      // Si viene solicitudId, actualiza también ese campo
+      result = await query(
+        `
+          UPDATE reclamos 
+          SET estado = $1, respuesta = $2, updated_at = NOW(), solicitud_id = $4
+          WHERE id = $3
+          RETURNING *
+        `,
+        [estado, respuesta, id, solicitudId]
+      );
+    } else {
+      // Si no viene solicitudId, no lo actualices
+      result = await query(
+        `
+          UPDATE reclamos 
+          SET estado = $1, respuesta = $2, updated_at = NOW()
+          WHERE id = $3
+          RETURNING *
+        `,
+        [estado, respuesta, id]
+      );
+    }
+
+    if (result.rowCount === 0) {
+      console.log("No se encontró el reclamo para actualizar:", id);
+      return NextResponse.json({ message: "Reclamo no encontrado" }, { status: 404 });
+    }
+
+    const reclamo = result.rows[0];
+    console.log("Reclamo actualizado:", reclamo);
+
+    // Obtener información de la solicitud asociada SOLO si existe solicitud_id
+    if (reclamo.solicitud_id) {
+      console.log("Buscando solicitud asociada con ID:", reclamo.solicitud_id);
+      const solicitudResult = await query(
+        `
+          SELECT id, numero_expediente, estado, usuario_id 
+          FROM solicitudes 
+          WHERE id = $1
+        `,
+        [reclamo.solicitud_id]
+      );
+
+      if (solicitudResult.rowCount === 0) {
+        console.log("No se encontró la solicitud asociada:", reclamo.solicitud_id);
+        return NextResponse.json({ message: "Solicitud asociada no encontrada" }, { status: 404 });
+      }
+
+      const solicitud = solicitudResult.rows[0];
+      console.log("Solicitud asociada encontrada:", solicitud);
+
+      // Comparar estado ignorando mayúsculas/minúsculas y espacios
+      console.log("Estado actual de la solicitud:", solicitud.estado, "| Estado esperado: 'rechazada'");
+      if (
+        estado === "aprobado" &&
+        typeof solicitud.estado === "string" &&
+        solicitud.estado.trim().toLowerCase() === "rechazada"
+      ) {
+        console.log("Actualizando solicitud a 'aprobada'...");
+        await query(
+          `
+            UPDATE solicitudes 
+            SET estado = 'aprobada', updated_at = NOW()
+            WHERE id = $1
+          `,
+          [solicitud.id]
+        );
+        console.log("Solicitud actualizada a 'aprobada'");
+
+        // --- Generar el memorando PDF al aprobar el reclamo ---
+        let pdfUrl = null
+        try {
+          // Obtener datos completos de la solicitud y usuario
+          const solicitudCompletaResult = await query(
+            `SELECT s.*, u.nombre as usuario_nombre
+             FROM solicitudes s
+             JOIN usuarios u ON s.usuario_id = u.id
+             WHERE s.id = $1`,
+            [solicitud.id]
+          );
+          if (solicitudCompletaResult.rowCount > 0) {
+            const s = solicitudCompletaResult.rows[0];
+            const pdfDoc = await PDFDocument.create();
+            const page = pdfDoc.addPage([595, 842]); // A4
+            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            const fontSize = 12;
+            let y = 780;
+            const drawLine = (label: string, value: any) => {
+              page.drawText(`${label}: ${value ?? "-"}`, { x: 50, y, size: fontSize, font });
+              y -= 20;
+            };
+            drawLine("ID", s.id);
+            drawLine("N° Expediente", s.numero_expediente);
+            drawLine("Tipo", s.tipo);
+            drawLine("Motivo", s.descripcion);
+            drawLine("Fecha Inicio", s.fecha_inicio);
+            drawLine("Fecha Fin", s.fecha_fin);
+            drawLine("Estado", "aprobada");
+            drawLine("Comentarios", s.comentarios);
+            drawLine("Usuario", s.usuario_nombre);
+            const pdfBytes = await pdfDoc.save();
+            const uploadsDir = path.join(process.cwd(), "public", "pdf");
+            try {
+              await mkdir(uploadsDir, { recursive: true });
+            } catch (mkdirErr) {
+              console.error("Error creando el directorio public/pdf:", mkdirErr);
+            }
+            const filePath = path.join(uploadsDir, `solicitud_${s.id}.pdf`);
+            try {
+              await writeFile(filePath, pdfBytes);
+              pdfUrl = `/pdf/solicitud_${s.id}.pdf`
+              console.log("PDF generado y guardado en:", filePath);
+            } catch (writeErr) {
+              console.error("Error guardando el PDF:", writeErr, "Path:", filePath);
+            }
+          } else {
+            console.error("No se encontró la solicitud para generar el PDF.");
+          }
+        } catch (pdfError) {
+          console.error("Error generando el memorando PDF tras aprobar reclamo:", pdfError);
+        }
+        // --- Fin generación PDF ---
+
+        // Crear notificación para el usuario sobre la actualización de la solicitud
+        let mensajeNotificacion = `Tu solicitud con expediente ${solicitud.numero_expediente} ha sido aprobada tras la revisión de tu reclamo.`
+        if (pdfUrl) {
+          mensajeNotificacion += ` <a href="${pdfUrl}" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: bold;">Ver Memorando</a>`
+        }
+        await query(
+          `
+            INSERT INTO notificaciones (usuario_id, titulo, mensaje)
+            VALUES ($1, $2, $3)
+          `,
+          [
+            solicitud.usuario_id,
+            "Solicitud aprobada",
+            mensajeNotificacion,
+          ]
+        );
+      } else {
+        console.log("No se cumplen condiciones para actualizar la solicitud.");
+      }
+
+      // Crear notificación para el usuario sobre el estado del reclamo
+      const titulo = `Reclamo ${estado === "aprobado" ? "aprobado" : "rechazado"}`;
+      const mensaje =
+        estado === "aprobado"
+          ? `Tu reclamo para la solicitud con expediente ${solicitud.numero_expediente} ha sido aprobado. Respuesta: ${respuesta || "Sin respuesta"}`
+          : `Tu reclamo para la solicitud con expediente ${solicitud.numero_expediente} ha sido rechazado. Respuesta: ${respuesta || "Sin respuesta"}`;
+
+      await query(
+        `
+          INSERT INTO notificaciones (usuario_id, titulo, mensaje)
+          VALUES ($1, $2, $3)
+        `,
+        [solicitud.usuario_id, titulo, mensaje]
+      );
+    } else {
+      console.log("El reclamo no tiene solicitud_id asociado.");
+    }
+
+    return NextResponse.json({ message: `Reclamo ${estado} exitosamente` });
+  } catch (error) {
+    console.error("Error al actualizar reclamo:", error);
+    return NextResponse.json({ message: "Error en el servidor" }, { status: 500 });
   }
 }

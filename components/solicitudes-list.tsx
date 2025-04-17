@@ -39,6 +39,7 @@ interface Solicitud {
   cargo: string
   institucion: string
   rutaAdjunto: string | null
+  pdfUrl?: string | null
   usuario?: {
     id: number
     nombre: string
@@ -184,6 +185,10 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
 
   return (
     <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <Badge className="bg-blue-600 text-white">Solicitud</Badge>
+        <span className="font-semibold text-lg">Lista de Solicitudes</span>
+      </div>
       <Card className="w-full">
         <CardContent>
           <div className="rounded-md border">
@@ -229,6 +234,17 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
                               <Eye className="h-4 w-4" />
                               <span className="sr-only">Ver detalles</span>
                             </Button>
+                            {s.estado === "aprobada" && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="ml-2"
+                                onClick={() => window.open(`/pdf/solicitud_${s.id}.pdf`, "_blank")}
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Ver Memorando
+                              </Button>
+                            )}
                             {s.rutaAdjunto && (
                               <Button
                                 variant="link"

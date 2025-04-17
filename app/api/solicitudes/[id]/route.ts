@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { query } from "@/lib/db/postgres" // Utiliza tu cliente de PostgreSQL
 import { getCurrentUser, verifyAdmin } from "@/lib/auth" // Para verificar el usuario y el rol
+import { writeFile, mkdir } from "fs/promises"
+import path from "path"
+import { PDFDocument, StandardFonts } from "pdf-lib"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -93,7 +96,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     // Consultar solicitud en la base de datos
     const result = await query(
-      `SELECT id, usuario_id, numero_expediente FROM solicitudes WHERE id = $1`,
+      `SELECT id, usuario_id, numero_expediente, tipo, motivo FROM solicitudes WHERE id = $1`,
       [id]
     )
 
@@ -110,18 +113,53 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     )
 
     // Crear la notificación
+    let pdfUrl = null
+    if (estado === "aprobada") {
+      try {
+        const pdfDoc = await PDFDocument.create()
+        const page = pdfDoc.addPage([595, 842])
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+        const fontSize = 12
+        let y = 780
+        const drawLine = (label: string, value: any) => {
+          page.drawText(`${label}: ${value ?? "-"}`, { x: 50, y, size: fontSize, font })
+          y -= 20
+        }
+        drawLine("ID", solicitud.id)
+        drawLine("N° Expediente", solicitud.numero_expediente)
+        drawLine("Tipo", solicitud.tipo)
+        drawLine("Motivo", solicitud.motivo)
+        drawLine("Estado", estado)
+        drawLine("Comentarios", comentarios)
+        drawLine("Usuario", "") 
+        const pdfBytes = await pdfDoc.save()
+        const uploadsDir = path.join(process.cwd(), "public", "pdf")
+        await mkdir(uploadsDir, { recursive: true })
+        const filePath = path.join(uploadsDir, `solicitud_${solicitud.id}.pdf`)
+        await writeFile(filePath, pdfBytes)
+        pdfUrl = `/pdf/solicitud_${solicitud.id}.pdf`
+      } catch (err) {
+        console.error("Error generando PDF al aprobar solicitud:", err)
+      }
+    }
+
     const estadoTexto = estado === "aprobada" ? "aprobada" : "rechazada"
+    let mensajeNotificacion = `Tu solicitud ${solicitud.numero_expediente} ha sido ${estadoTexto}.`
+    if (estado === "aprobada" && pdfUrl) {
+      mensajeNotificacion += ` <a href="${pdfUrl}" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: bold;">Ver Memorando</a>`
+    }
     await query(
       `INSERT INTO notificaciones (usuario_id, titulo, mensaje) VALUES ($1, $2, $3)`,
       [
         solicitud.usuario_id,
         `Solicitud ${estadoTexto}`,
-        `Tu solicitud ${solicitud.numero_expediente} ha sido ${estadoTexto}.`,
+        mensajeNotificacion,
       ]
     )
 
     return NextResponse.json({
       message: `Solicitud ${estadoTexto} exitosamente`,
+      pdfUrl
     })
   } catch (error) {
     console.error("Error al actualizar solicitud:", error)

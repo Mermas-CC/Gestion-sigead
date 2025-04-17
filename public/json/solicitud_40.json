@@ -1,0 +1,21 @@
+{
+  "id": 40,
+  "numeroExpediente": "EXP-2025-0002",
+  "tipo": "vacaciones",
+  "motivo": "Vacaciones solicitadas",
+  "fechaInicio": "2025-04-17T05:00:00.000Z",
+  "fechaFin": "2025-04-17T05:00:00.000Z",
+  "estado": "aprobada",
+  "fechaSolicitud": "2025-04-16T15:01:01.177Z",
+  "fechaActualizacion": "2025-04-16T15:49:40.008Z",
+  "celular": "951951951",
+  "correo": "mermas@gmail.com",
+  "cargo": "penesor",
+  "institucion": "casita",
+  "goceRemuneraciones": true,
+  "comentarios": "uwuuuuuuuuu",
+  "usuario": {
+    "nombre": "mermitas itas",
+    "departamento": "marketing"
+  }
+}

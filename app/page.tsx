@@ -17,6 +17,10 @@ export default function Home() {
           <Button asChild size="lg">
             <Link href="/login">Iniciar Sesión</Link>
           </Button>
+          {/* Botón de registro */}
+          <Button asChild size="lg" variant="outline">
+            <Link href="/register">Registrarse</Link>
+          </Button>
         </div>
         
       </div>

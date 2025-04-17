@@ -136,7 +136,11 @@ export function NotificationsButton() {
                     <h5 className="font-medium">{notification.titulo}</h5>
                     <span className="text-xs text-muted-foreground">{formatDate(notification.fechaCreacion)}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{notification.mensaje}</p>
+                  {/* Renderiza el mensaje como HTML seguro */}
+                  <p
+                    className="text-sm text-muted-foreground"
+                    dangerouslySetInnerHTML={{ __html: notification.mensaje }}
+                  />
                 </div>
               ))}
             </div>

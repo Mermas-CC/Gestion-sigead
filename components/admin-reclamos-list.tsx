@@ -32,7 +32,15 @@ interface Reclamo {
   fechaCreacion: string
   solicitud?: {
     numeroExpediente: string | null
+    tipo?: string
+    fechaInicio?: string
+    fechaFin?: string
   }
+}
+
+const formatDate = (date: string) => {
+  const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" }
+  return new Date(date).toLocaleDateString(undefined, options)
 }
 
 export default function AdminReclamosList() {
@@ -136,7 +144,16 @@ export default function AdminReclamosList() {
                 <TableRow key={reclamo.id}>
                   <TableCell>{reclamo.id}</TableCell>
                   <TableCell>{reclamo.solicitud?.numeroExpediente || "N/A"}</TableCell>
-                  <TableCell>{reclamo.mensaje}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{reclamo.solicitud?.tipo || "Sin tipo"}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {reclamo.solicitud?.fechaInicio
+                          ? `Del ${formatDate(reclamo.solicitud.fechaInicio)} al ${formatDate(reclamo.solicitud.fechaFin)}`
+                          : "Sin período"}
+                      </p>
+                    </div>
+                  </TableCell>
                   <TableCell>{getStatusBadge(reclamo.estado)}</TableCell>
                   <TableCell className="text-right">
                     <Button

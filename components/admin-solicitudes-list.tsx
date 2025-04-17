@@ -42,6 +42,7 @@ interface Solicitud {
   fechaSolicitud: string
   contratoUrl: string | null
   rutaAdjunto: string | null
+  pdfUrl: string | null
 }
 
 interface AdminSolicitudesListProps {
@@ -232,6 +233,18 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
                       >
                         <FileText className="h-4 w-4 mr-2" />
                         Ver archivo
+                      </Button>
+                    )}
+                    {/* Botón para ver el PDF del memorando si existe */}
+                    {solicitud.estado === "aprobada" && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="ml-2"
+                        onClick={() => window.open(`/pdf/solicitud_${solicitud.id}.pdf`, "_blank")}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Ver Memorando
                       </Button>
                     )}
                   </TableCell>

@@ -1,0 +1,21 @@
+{
+  "id": 48,
+  "numeroExpediente": "EXP-2025-0010",
+  "tipo": "vacaciones",
+  "motivo": "Vacaciones solicitadas",
+  "fechaInicio": "2025-04-04T05:00:00.000Z",
+  "fechaFin": "2025-04-13T05:00:00.000Z",
+  "estado": "aprobada",
+  "fechaSolicitud": "2025-04-16T16:23:38.564Z",
+  "fechaActualizacion": "2025-04-16T16:24:35.455Z",
+  "celular": "q",
+  "correo": "asd@asd.com",
+  "cargo": "q",
+  "institucion": "q",
+  "goceRemuneraciones": true,
+  "comentarios": "q",
+  "usuario": {
+    "nombre": "mermitas itas",
+    "departamento": "marketing"
+  }
+}
