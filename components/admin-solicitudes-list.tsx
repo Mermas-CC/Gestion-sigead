@@ -168,13 +168,12 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
           />
         </div>
       </div>
-      <div className="rounded-md">
+      <div className="rounded-md bg-list">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Expediente</TableHead>
               <TableHead>Usuario</TableHead>
-              <TableHead>Departamento</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Período</TableHead>
               <TableHead>Estado</TableHead>
@@ -184,7 +183,7 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
           <TableBody>
             {filteredSolicitudes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No hay solicitudes para mostrar
                 </TableCell>
               </TableRow>
@@ -193,7 +192,6 @@ export function AdminSolicitudesList({ status }: AdminSolicitudesListProps) {
                 <TableRow key={solicitud.id}>
                   <TableCell className="font-medium">{solicitud.numeroExpediente}</TableCell>
                   <TableCell>{solicitud.usuario?.nombre || "Sin nombre"}</TableCell>
-                  <TableCell>{solicitud.usuario?.departamento || "Sin departamento"}</TableCell>
                   <TableCell>{solicitud.tipo}</TableCell>
                   <TableCell>
                     {formatDate(solicitud.fechaInicio)} - {formatDate(solicitud.fechaFin)}

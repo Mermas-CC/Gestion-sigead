@@ -122,8 +122,12 @@ export default async function AdminDashboardPage() {
     }
     return (
     <div className="container py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <div>
+          <div className="flex flex-row items-center gap-6 mb-2">
+            <img src="/logo.png" alt="Logo Plataforma" className="h-12 w-auto" />
+            <img src="/ugel.png" alt="Logo Institución" className="h-12 w-auto" />
+          </div>
           <h1 className="text-3xl font-bold tracking-tight">Panel de Administración</h1>
         </div>
         <div className="flex gap-4">
@@ -250,17 +254,15 @@ export default async function AdminDashboardPage() {
           <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
           <TabsTrigger value="aprobadas">Aprobadas</TabsTrigger>
           <TabsTrigger value="rechazadas">Rechazadas</TabsTrigger>
-          <TabsTrigger value="correccion">Requieren corrección</TabsTrigger>
-          <TabsTrigger value="todas">Todas</TabsTrigger>
           {/* Separador visual */}
           <span className="mx-2 border-l h-6 border-gray-300"></span>
           {/* Sección de Reclamos */}
           <span className="flex items-center gap-2 mr-2">
             <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-semibold">Reclamos</span>
           </span>
-          <TabsTrigger value="reclamos">
-            Reclamos
-          </TabsTrigger>
+          <TabsTrigger value="pendientes-reclamos">Pendientes</TabsTrigger>
+          <TabsTrigger value="aprobadas-reclamos">Aprobadas</TabsTrigger>
+          <TabsTrigger value="rechazadas-reclamos">Rechazadas</TabsTrigger>
         </TabsList>
         <TabsContent value="pendientes">
           <AdminSolicitudesList status="pendiente" />
@@ -271,14 +273,14 @@ export default async function AdminDashboardPage() {
         <TabsContent value="rechazadas">
           <AdminSolicitudesList status="rechazada" />
         </TabsContent>
-        <TabsContent value="correccion">
-          <AdminSolicitudesList status="correccion" />
+        <TabsContent value="pendientes-reclamos">
+          <AdminReclamosList status="pendiente" />
         </TabsContent>
-        <TabsContent value="todas">
-          <AdminSolicitudesList />
+        <TabsContent value="aprobadas-reclamos">
+          <AdminReclamosList status="aprobado" />
         </TabsContent>
-        <TabsContent value="reclamos">
-          <AdminReclamosList />
+        <TabsContent value="rechazadas-reclamos">
+          <AdminReclamosList status="rechazado" />
         </TabsContent>
       </Tabs>
     </div>

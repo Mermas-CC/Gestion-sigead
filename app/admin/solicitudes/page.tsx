@@ -112,7 +112,7 @@ export default function SolicitudesAdminPage() {
         </div>
       </div>
 
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border overflow-x-auto bg-list">
         <Table>
           <TableHeader>
             <TableRow>

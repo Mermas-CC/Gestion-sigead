@@ -4,11 +4,12 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 // GET: Obtener un usuario por ID
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   try {
     const result = await query(
       "SELECT id, nombre, email, departamento, rol, activo, telefono, cargo, contrato_url, tipo_contrato_id, nivel_carrera_id FROM usuarios WHERE id = $1",
-      [params.id]
+      [id]
     );
     if (result.rowCount === 0) {
       return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 });
@@ -20,7 +21,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 // PATCH: Editar usuario
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   try {
     const formData = await request.formData();
 
@@ -90,7 +92,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       idx++;
     }
 
-    values.push(params.id);
+    values.push(id);
 
     const result = await query(
       `UPDATE usuarios SET ${updateFields.join(", ")} WHERE id = $${idx} RETURNING id, nombre, email, departamento, rol, activo, telefono, cargo, contrato_url, tipo_contrato_id, nivel_carrera_id`,
@@ -108,9 +110,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE: Eliminar usuario
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   try {
-    const result = await query("DELETE FROM usuarios WHERE id = $1 RETURNING id", [params.id]);
+    const result = await query("DELETE FROM usuarios WHERE id = $1 RETURNING id", [id]);
     if (result.rowCount === 0) {
       return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 });
     }

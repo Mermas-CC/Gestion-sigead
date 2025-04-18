@@ -5,6 +5,135 @@ import { writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { PDFDocument, StandardFonts } from "pdf-lib"
 
+// Función utilitaria para generar el memorando PDF con el mismo diseño que admin/solicitudes
+async function generarMemorandoPDF({
+  numeroExpediente,
+  asunto,
+  fecha,
+  usuarioNombre,
+  razon,
+  goceRemuneraciones,
+  cargo,
+  periodo
+}: {
+  numeroExpediente: string,
+  asunto: string,
+  fecha: string,
+  usuarioNombre: string,
+  razon: string,
+  goceRemuneraciones: boolean,
+  cargo: string,
+  periodo: string
+}) {
+  const pdfDoc = await PDFDocument.create()
+  const page = pdfDoc.addPage([595, 842]) // A4
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  const fontSize = 12
+
+  // Cargar imágenes de logos (PNG o JPG)
+  const fs = require("fs")
+  let ugelLogo, mineduLogo
+  try {
+    const ugelLogoPath = path.join(process.cwd(), "public", "ugel.png")
+    const ugelLogoBytes = fs.readFileSync(ugelLogoPath)
+    ugelLogo = await pdfDoc.embedPng(ugelLogoBytes)
+  } catch (e) {
+    try {
+      const ugelLogoPathJpg = path.join(process.cwd(), "public", "ugel.jpg")
+      if (fs.existsSync(ugelLogoPathJpg)) {
+        const ugelLogoBytes = fs.readFileSync(ugelLogoPathJpg)
+        ugelLogo = await pdfDoc.embedJpg(ugelLogoBytes)
+      }
+    } catch {}
+  }
+  try {
+    const mineduLogoPath = path.join(process.cwd(), "public", "ministerio.png")
+    const mineduLogoBytes = fs.readFileSync(mineduLogoPath)
+    mineduLogo = await pdfDoc.embedPng(mineduLogoBytes)
+  } catch (e) {
+    try {
+      const mineduLogoPathJpg = path.join(process.cwd(), "public", "ministerio.jpg")
+      if (fs.existsSync(mineduLogoPathJpg)) {
+        const mineduLogoBytes = fs.readFileSync(mineduLogoPathJpg)
+        mineduLogo = await pdfDoc.embedJpg(mineduLogoBytes)
+      }
+    } catch {}
+  }
+
+  // Dibujar logos en la cabecera si existen
+  if (mineduLogo) page.drawImage(mineduLogo, { x: 50, y: 770, width: 80, height: 60 })
+  if (ugelLogo) page.drawImage(ugelLogo, { x: 465, y: 770, width: 80, height: 60 })
+
+  // Título centrado (centrado manualmente)
+  const title = "MEMORANDO"
+  const textWidth = fontBold.widthOfTextAtSize(title, 16)
+  page.drawText(title, {
+    x: (595 - textWidth) / 2,
+    y: 740,
+    size: 16,
+    font: fontBold
+  })
+
+  let y = 710
+
+  // Formatear fecha amigable
+  const formatFecha = (fechaStr: string) => {
+    const meses = [
+      "enero", "febrero", "marzo", "abril", "mayo", "junio",
+      "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    ]
+    const fecha = new Date(fechaStr)
+    const dia = fecha.getDate()
+    const mes = meses[fecha.getMonth()]
+    const anio = fecha.getFullYear()
+    return `${dia} de ${mes} de ${anio}`
+  }
+
+  // Datos del memorando
+  const drawLabelValue = (label: string, value: any) => {
+    page.drawText(`${label}:`, { x: 60, y, size: fontSize, font: fontBold })
+    page.drawText(`${value ?? "-"}`, { x: 180, y, size: fontSize, font })
+    y -= 22
+  }
+
+  // Campos requeridos
+  drawLabelValue("Expediente", numeroExpediente)
+  drawLabelValue("Asunto", asunto)
+  drawLabelValue("Fecha", formatFecha(fecha))
+  drawLabelValue("Nombre", usuarioNombre)
+  drawLabelValue("Cargo", cargo ?? "-")
+  drawLabelValue("Razón", razon)
+  drawLabelValue(
+    "Con/Sin Goce",
+    goceRemuneraciones === true
+      ? "Con goce de remuneraciones"
+      : goceRemuneraciones === false
+        ? "Sin goce de remuneraciones"
+        : "-"
+  )
+  drawLabelValue("Periodo Solicitado", periodo)
+
+  y -= 20
+
+  // Cuerpo del memorando
+  const cuerpo = `Por medio del presente, se comunica la aprobación de la solicitud registrada bajo el expediente N° ${numeroExpediente}, correspondiente al(la) trabajador(a) ${usuarioNombre} (${cargo ?? "-"}), para el periodo comprendido entre ${periodo}, por la razón: ${razon}. El beneficio es otorgado ${
+    goceRemuneraciones === true
+      ? "con goce de remuneraciones"
+      : goceRemuneraciones === false
+        ? "sin goce de remuneraciones"
+        : "-"
+  }.`
+  page.drawText(cuerpo, { x: 60, y, size: fontSize, font, maxWidth: 475, lineHeight: 18 })
+
+  // Pie de página
+  page.drawText("Atentamente,", { x: 60, y: y - 80, size: fontSize, font })
+  page.drawText("__________________________", { x: 60, y: y - 110, size: fontSize, font })
+  page.drawText("UGEL", { x: 60, y: y - 125, size: fontSize, font })
+
+  return await pdfDoc.save()
+}
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
     const userCheck = await getCurrentUser(request)
@@ -80,7 +209,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     ) {
       // Obtener la solicitud asociada
       const solicitudResult = await query(
-        `SELECT id, estado, numero_expediente, tipo, descripcion, fecha_inicio, fecha_fin, comentarios, usuario_id FROM solicitudes WHERE id = $1`,
+        `SELECT id, estado, numero_expediente, tipo, descripcion, fecha_inicio, fecha_fin, comentarios, usuario_id, goce_remuneraciones, cargo, updated_at, created_at FROM solicitudes WHERE id = $1`,
         [reclamoActualizado.solicitud_id]
       )
       if (
@@ -94,7 +223,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           [reclamoActualizado.solicitud_id]
         )
 
-        // --- Generar PDF del memorando ---
+        // --- Generar PDF del memorando con el mismo diseño que admin/solicitudes ---
         let pdfUrl = null
         try {
           const s = solicitudResult.rows[0]
@@ -104,25 +233,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
             [s.usuario_id]
           )
           const usuarioNombre = userResult.rowCount > 0 ? userResult.rows[0].nombre : "Desconocido"
-          const pdfDoc = await PDFDocument.create()
-          const page = pdfDoc.addPage([595, 842]) // A4
-          const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-          const fontSize = 12
-          let y = 780
-          const drawLine = (label: string, value: any) => {
-            page.drawText(`${label}: ${value ?? "-"}`, { x: 50, y, size: fontSize, font })
-            y -= 20
-          }
-          drawLine("ID", s.id)
-          drawLine("N° Expediente", s.numero_expediente)
-          drawLine("Tipo", s.tipo)
-          drawLine("Motivo", s.descripcion)
-          drawLine("Fecha Inicio", s.fecha_inicio)
-          drawLine("Fecha Fin", s.fecha_fin)
-          drawLine("Estado", "aprobada")
-          drawLine("Comentarios", s.comentarios)
-          drawLine("Usuario", usuarioNombre)
-          const pdfBytes = await pdfDoc.save()
+          const pdfBytes = await generarMemorandoPDF({
+            numeroExpediente: s.numero_expediente,
+            asunto: s.tipo,
+            fecha: s.updated_at || s.created_at,
+            usuarioNombre,
+            razon: s.descripcion,
+            goceRemuneraciones: s.goce_remuneraciones,
+            cargo: s.cargo,
+            periodo: `${s.fecha_inicio ? new Date(s.fecha_inicio).toISOString().split("T")[0] : "-"} a ${s.fecha_fin ? new Date(s.fecha_fin).toISOString().split("T")[0] : "-"}`
+          })
           const uploadsDir = path.join(process.cwd(), "public", "pdf")
           await mkdir(uploadsDir, { recursive: true })
           const filePath = path.join(uploadsDir, `solicitud_${s.id}.pdf`)

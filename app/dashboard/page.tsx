@@ -89,16 +89,24 @@ export default function DashboardPage() {
       </div>
 
       <Tabs defaultValue="pendientes" className="space-y-6">
-        <TabsList className="flex flex-wrap gap-1">
+      <TabsList>
+          {/* Sección de Licencias/Solicitudes */}
+          <span className="flex items-center gap-2 mr-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-semibold">Licencias</span>
+          </span>
           <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
           <TabsTrigger value="aprobadas">Aprobadas</TabsTrigger>
           <TabsTrigger value="rechazadas">Rechazadas</TabsTrigger>
-          <TabsTrigger value="todas">Todas</TabsTrigger>
-          <TabsTrigger value="reclamos">Reclamos</TabsTrigger>
-          <TabsTrigger value="aprobados-reclamos">Reclamos Aprobados</TabsTrigger>
-          <TabsTrigger value="rechazados-reclamos">Reclamos Rechazados</TabsTrigger>
+          {/* Separador visual */}
+          <span className="mx-2 border-l h-6 border-gray-300"></span>
+          {/* Sección de Reclamos */}
+          <span className="flex items-center gap-2 mr-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-semibold">Reclamos</span>
+          </span>
+          <TabsTrigger value="pendientes-reclamos">Pendientes</TabsTrigger>
+          <TabsTrigger value="aprobadas-reclamos">Aprobadas</TabsTrigger>
+          <TabsTrigger value="rechazadas-reclamos">Rechazadas</TabsTrigger>
         </TabsList>
-
         {/* Solicitudes */}
         <TabsContent value="pendientes">
           <SolicitudesList status="pendiente" />
@@ -109,18 +117,15 @@ export default function DashboardPage() {
         <TabsContent value="rechazadas">
           <SolicitudesList status="rechazada" />
         </TabsContent>
-        <TabsContent value="todas">
-          <SolicitudesList />
-        </TabsContent>
 
         {/* Reclamos */}
-        <TabsContent value="reclamos">
+        <TabsContent value="pendientes-reclamos">
           <ReclamosList status="pendiente" />
         </TabsContent>
-        <TabsContent value="aprobados-reclamos">
+        <TabsContent value="aprobadas-reclamos">
           <ReclamosList status="aprobado" />
         </TabsContent>
-        <TabsContent value="rechazados-reclamos">
+        <TabsContent value="rechazadas-reclamos">
           <ReclamosList status="rechazado" />
         </TabsContent>
       </Tabs>

@@ -125,7 +125,10 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <img src="/logo.png" alt="Logo Institucional" className="mx-auto h-16" />
+          <div className="flex flex-row items-center justify-center gap-6 mb-2">
+            <img src="/logo.png" alt="Logo Plataforma" className="h-14 w-auto" />
+            <img src="/ugel.png" alt="Logo Institución" className="h-14 w-auto" />
+          </div>
           <CardTitle className="text-2xl font-bold">Crear Cuenta</CardTitle>
           <CardDescription>Completa los campos para registrarte en el sistema</CardDescription>
         </CardHeader>

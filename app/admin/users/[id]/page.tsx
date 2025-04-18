@@ -13,6 +13,9 @@ import { AlertCircle, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
 export default function EditUserPage({ params }: { params: { id: string } }) {
+  // Next.js warning: params may be a Promise en futuras versiones.
+  // Usar React.use() para desempaquetar.
+  const { id } = React.use(params)
   const router = useRouter()
   const [formData, setFormData] = useState<any>(null)
   const [error, setError] = useState("")
@@ -24,7 +27,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     async function fetchData() {
       try {
         const [userRes, contractRes, careerRes] = await Promise.all([
-          fetch(`/api/admin/users/${params.id}`),
+          fetch(`/api/admin/users/${id}`),
           fetch("/api/admin/contract-types"),
           fetch("/api/admin/career-levels"),
         ])
@@ -38,7 +41,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       }
     }
     fetchData()
-  }, [params.id])
+  }, [id])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
@@ -80,7 +83,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     }
 
     try {
-      const response = await fetch(`/api/admin/users/${params.id}`, {
+      const response = await fetch(`/api/admin/users/${id}`, {
         method: "PATCH",
         body,
       })

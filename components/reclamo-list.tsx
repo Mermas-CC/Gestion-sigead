@@ -41,7 +41,7 @@ interface ReclamosListProps {
   showAll?: boolean
 }
 
-export function ReclamosList({ status, showAll = false }: ReclamosListProps) {
+export function ReclamosList({ status }: ReclamosListProps) {
   const [reclamos, setReclamos] = useState<Reclamo[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
@@ -68,7 +68,14 @@ export function ReclamosList({ status, showAll = false }: ReclamosListProps) {
         }
 
         const data = await response.json()
-        setReclamos(data.reclamos || [])
+        // Si la respuesta trae el mensaje de "no hay reclamos disponibles"
+        if (Array.isArray(data.reclamos) && data.reclamos.length === 0 && data.message) {
+          setReclamos([])
+          setError(data.message)
+        } else {
+          setReclamos(data.reclamos || [])
+          setError("")
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error desconocido")
         console.error(err)
@@ -80,9 +87,7 @@ export function ReclamosList({ status, showAll = false }: ReclamosListProps) {
     fetchReclamos()
   }, [status])
 
-  const filteredReclamos = showAll
-    ? reclamos
-    : reclamos.filter((r) => (status ? r.estado === status : r.estado === "pendiente"))
+  const filteredReclamos = reclamos
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "No disponible"
@@ -136,7 +141,7 @@ export function ReclamosList({ status, showAll = false }: ReclamosListProps) {
       </div>
       <Card>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border bg-list">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -151,7 +156,9 @@ export function ReclamosList({ status, showAll = false }: ReclamosListProps) {
                 {filteredReclamos.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No hay reclamos para mostrar
+                      {error === "no hay reclamos disponibles"
+                        ? "No hay reclamos disponibles"
+                        : "No hay reclamos para mostrar"}
                     </TableCell>
                   </TableRow>
                 ) : (

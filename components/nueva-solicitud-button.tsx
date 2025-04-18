@@ -55,24 +55,44 @@ export function NuevaSolicitudButton() {
     comentarios: "",
   })
   
-  // Opciones de licencias según el tipo
   const opcionesLicencia = {
     con: [
-      { value: "incapacidad", label: "Incapacidad temporal" },
-      { value: "familiar_grave", label: "Familiar grave/terminal o accidente grave" },
-      { value: "maternidad", label: "Maternidad / Paternidad / Adopción" },
-      { value: "prenatal", label: "Aplazamiento prenatal" },
-      { value: "estudios", label: "Estudios de posgrado, capacitación oficial MINEDU" },
-      { value: "representacion", label: "Representación sindical / política / nacional" },
-      { value: "medica", label: "Asistencia médica, terapias, exámenes preventivos" },
+      { value: "incapacidad", label: "Licencia por incapacidad temporal" },
+      { value: "familiar_grave_accidente", label: "Por familiar grave o terminal o sufra accidente grave" },
+      { value: "maternidad", label: "Licencia por maternidad" },
+      { value: "aplazamiento_prenatal", label: "Aplazamiento del descanso prenatal" },
+      { value: "paternidad", label: "Licencia por paternidad" },
+      { value: "adopcion", label: "Licencia por adopción" },
+      { value: "siniestros", label: "Licencia por siniestros" },
+      { value: "estudios_posgrado", label: "Por estudios de posgrado, especialización o perfeccionamiento" },
+      { value: "capacitacion_minedu", label: "Por capacitación planeada por MINEDU o los gobiernos regionales" },
+      { value: "representacion_estado", label: "Por asumir representación oficial del estado Peruano" },
+      { value: "citacion_expresa", label: "Por citación expresa, judicial, militar o policial" },
+      { value: "representacion_sindical", label: "Licencia por representación sindical" },
+      { value: "licencia_nacional", label: "Licencia de alcance nacional" },
+      { value: "cargo_politico", label: "Por desempeñarse como consejero regional o regidor municipal" },
+      { value: "asistencia_medica", label: "Para asistencia médica, terapia de rehabilitación en caso de discapacidad" },
+      { value: "examenes_oncologicos", label: "Para realizar exámenes oncológicos preventivos anuales" },
     ],
     sin: [
-      { value: "particulares", label: "Motivos particulares" },
-      { value: "capacitacion_no_oficial", label: "Capacitación no oficial" },
-      { value: "enfermedad_familiar", label: "Enfermedad de familiares, cargos políticos" },
-      { value: "varios", label: "Permisos varios (enfermedad, maternidad, etc.)" },
+      { value: "motivos_particulares", label: "Licencia por Motivos Particulares" },
+      { value: "capacitacion_no_oficial", label: "Por capacitación no oficializada" },
+      { value: "funcion_publica", label: "Por desempeño de funciones públicas por elección o por asumir cargos políticos o de confianza" },
+      { value: "enfermedad_familiar", label: "Por enfermedad grave de los padres, cónyuge, conviviente reconocido judicialmente o hijos" },
+      { value: "conclusion_anticipada", label: "Conclusión anticipada de la licencia" },
+      { value: "permiso_docentes", label: "Permisos para docentes de educación básica regular y técnico productiva" },
+      { value: "permiso_enfermedad", label: "Permiso por enfermedad" },
+      { value: "permiso_maternidad", label: "Permiso por maternidad" },
+      { value: "permiso_lactancia", label: "Permiso por lactancia" },
+      { value: "permiso_capacitacion_oficial", label: "Permiso por capacitación oficializada" },
+      { value: "permiso_citacion", label: "Por citación expresa judicial, militar o policial" },
+      { value: "permiso_onomastico", label: "Permiso por onomástico" },
+      { value: "permiso_dia_maestro", label: "Permiso por: día del maestro" },
+      { value: "permiso_docencia_universitaria", label: "Permiso para ejercer como docente en universidad" },
+      { value: "permiso_representacion_sindical", label: "Permiso por representar sindicalmente" },
     ],
-  }
+  };
+  
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -99,47 +119,48 @@ export function NuevaSolicitudButton() {
         return
       }
 
-      let rutaAdjunto = null
+      let response, data
 
-      // Si hay archivo adjunto, subirlo primero
       if (archivo) {
-        const formDataFile = new FormData()
-        formDataFile.append("file", archivo)
-        formDataFile.append("tipo", "solicitud")
+        // Enviar todo como FormData si hay archivo
+        const formDataToSend = new FormData()
+        formDataToSend.append("tipo", formData.tipoLicencia)
+        formDataToSend.append("motivo", formData.motivo)
+        formDataToSend.append("fechaInicio", formData.fechaInicio.toISOString().split("T")[0])
+        formDataToSend.append("fechaFin", formData.fechaFin.toISOString().split("T")[0])
+        formDataToSend.append("celular", formData.celular)
+        formDataToSend.append("correo", formData.correo)
+        formDataToSend.append("cargo", formData.cargo)
+        formDataToSend.append("institucion", formData.institucion)
+        formDataToSend.append("goceRemuneraciones", (formData.goceRemuneraciones === "con").toString())
+        formDataToSend.append("comentarios", formData.comentarios)
+        formDataToSend.append("archivo", archivo)
 
-        const fileResponse = await fetch("/api/upload", {
+        response = await fetch("/api/solicitudes", {
           method: "POST",
-          body: formDataFile,
+          body: formDataToSend,
         })
-
-        if (!fileResponse.ok) {
-          throw new Error("Error al subir el archivo adjunto")
-        }
-
-        const fileData = await fileResponse.json()
-        rutaAdjunto = fileData.ruta
+      } else {
+        // Enviar como JSON si no hay archivo
+        response = await fetch("/api/solicitudes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            goceRemuneraciones: formData.goceRemuneraciones === "con",
+            tipo: formData.tipoLicencia,
+            motivo: formData.motivo,
+            fechaInicio: formData.fechaInicio.toISOString().split("T")[0],
+            fechaFin: formData.fechaFin.toISOString().split("T")[0],
+            celular: formData.celular,
+            correo: formData.correo,
+            cargo: formData.cargo,
+            institucion: formData.institucion,
+            comentarios: formData.comentarios,
+          }),
+        })
       }
 
-      // Enviar solicitud a la API
-      const response = await fetch("/api/solicitudes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          goceRemuneraciones: formData.goceRemuneraciones === "con",
-          tipo: formData.tipoLicencia,
-          motivo: formData.motivo,
-          fechaInicio: formData.fechaInicio.toISOString().split("T")[0],
-          fechaFin: formData.fechaFin.toISOString().split("T")[0],
-          celular: formData.celular,
-          correo: formData.correo,
-          cargo: formData.cargo,
-          institucion: formData.institucion,
-          comentarios: formData.comentarios,
-          rutaAdjunto,
-        }),
-      })
-
-      const data = await response.json()
+      data = await response.json()
 
       if (!response.ok) {
         throw new Error(data.message || "Error al crear la solicitud")

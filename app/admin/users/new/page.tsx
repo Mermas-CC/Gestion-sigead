@@ -90,20 +90,6 @@ export default function NewUserPage() {
       }
     }
 
-    // // Crear un objeto de datos para enviar como JSON
-    // const dataToSend = {
-    //   name: formData.name,
-    //   email: formData.email,
-    //   password: formData.password,
-    //   department: formData.department || "",
-    //   role: formData.role || "user",
-    //   isActive: formData.isActive ? "true" : "false",
-    //   phone: formData.phone || "",
-    //   position: formData.position || "",
-    //   contractFile: formData.contractFile ? formData.contractFile.name : null, // solo el nombre del archivo
-    //   contractTypeId: formData.contractTypeId,
-    //   careerLevelId: formData.careerLevelId,
-    // }
       // Crear FormData para envío con archivo
   const body = new FormData()
   body.append("name", formData.name)
@@ -120,14 +106,6 @@ export default function NewUserPage() {
     body.append("contractFile", formData.contractFile)
   }
 
-    // try {
-    //   const response = await fetch("/api/admin/users", {
-    //     method: "POST",
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //     },
-    //     body: JSON.stringify(dataToSend), // Enviar como JSON
-    //   })
     try {
       const response = await fetch("/api/admin/users", {
         method: "POST",

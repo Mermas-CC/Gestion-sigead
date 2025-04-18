@@ -85,14 +85,12 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
     fetchSolicitudes();
   }, [status]);
 
-  const filteredSolicitudes = showAll
-    ? solicitudes
-    : solicitudes.filter((s) => {
-        if (status) {
-          return s.estado === status;
-        }
-        return s.estado === "pendiente" || new Date(s.fechaFin) >= new Date();
-      });
+  const filteredSolicitudes = solicitudes.filter((s) => {
+    if (status) {
+      return s.estado === status
+    }
+    return s.estado === "pendiente" || new Date(s.fechaFin) >= new Date()
+  });
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -191,7 +189,7 @@ export function SolicitudesList({ status, showAll = false }: SolicitudesListProp
       </div>
       <Card className="w-full">
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border bg-list">
             <Table>
               <TableHeader>
                 <TableRow>

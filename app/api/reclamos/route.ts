@@ -3,7 +3,63 @@ import { getCurrentUser } from "@/lib/auth"
 import { query } from "@/lib/db/postgres"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
-import { PDFDocument, StandardFonts } from "pdf-lib"
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
+
+// Función utilitaria para generar el memorando PDF con formato y mensaje
+async function generarMemorandoPDF({
+  numeroExpediente,
+  asunto,
+  fecha,
+  usuarioNombre,
+  razon,
+  goceRemuneraciones,
+  cargo,
+  periodo
+}: {
+  numeroExpediente: string,
+  asunto: string,
+  fecha: string,
+  usuarioNombre: string,
+  razon: string,
+  goceRemuneraciones: boolean,
+  cargo: string,
+  periodo: string
+}) {
+  const pdfDoc = await PDFDocument.create()
+  const page = pdfDoc.addPage([595, 842]) // A4
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  let y = 800
+
+  // Encabezado
+  page.drawText("UGEL ILO", { x: 50, y, size: 10, font: fontBold })
+  page.drawText("MEMORANDO", { x: 250, y, size: 16, font: fontBold })
+  y -= 30
+
+  // Datos principales
+  page.drawText(`Expediente: ${numeroExpediente}`, { x: 50, y, size: 12, font })
+  y -= 20
+  page.drawText(`Asunto: ${asunto}`, { x: 50, y, size: 12, font })
+  y -= 20
+  page.drawText(`Fecha: ${fecha}`, { x: 50, y, size: 12, font })
+  y -= 30
+
+  // Mensaje formal
+  const mensaje = `Por la presente se comunica al(la) Sr(a). ${usuarioNombre}, quien desempeña el cargo de ${cargo}, que se ha registrado la siguiente solicitud de licencia:\n\n` +
+    `- Razón: ${razon}\n` +
+    `- Tipo: ${goceRemuneraciones ? "Con goce de remuneraciones" : "Sin goce de remuneraciones"}\n` +
+    `- Período solicitado: ${periodo}\n\n` +
+    `Se le informa que la presente solicitud ha sido aprobada y se procederá conforme a la normativa vigente.\n\n` +
+    `Atentamente,\nUGEL ILO`
+
+  const lines = mensaje.split("\n")
+  for (const line of lines) {
+    page.drawText(line, { x: 50, y, size: 12, font })
+    y -= 18
+  }
+
+  return await pdfDoc.save()
+}
 
 // Endpoint para obtener reclamos
 export async function GET(request: Request) {
@@ -16,25 +72,35 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
-    const result = await query(
-      `
-        SELECT 
-          r.*, 
-          s.numero_expediente AS solicitud_numero_expediente,
-          s.tipo AS solicitud_tipo,
-          s.fecha_inicio AS solicitud_fecha_inicio,
-          s.fecha_fin AS solicitud_fecha_fin,
-          s.estado AS solicitud_estado
-        FROM reclamos r
-        LEFT JOIN solicitudes s ON r.solicitud_id = s.id
-        WHERE r.estado = $1
-        ORDER BY r.created_at DESC
-      `,
-      [estado]
-    )
+    // Filtrar por usuario si no es admin
+    let queryText = `
+      SELECT 
+        r.*, 
+        s.numero_expediente AS solicitud_numero_expediente,
+        s.tipo AS solicitud_tipo,
+        s.fecha_inicio AS solicitud_fecha_inicio,
+        s.fecha_fin AS solicitud_fecha_fin,
+        s.estado AS solicitud_estado
+      FROM reclamos r
+      LEFT JOIN solicitudes s ON r.solicitud_id = s.id
+      WHERE r.estado = $1
+    `
+    const params: any[] = [estado]
+
+    if (userCheck.user.role !== "admin") {
+      queryText += " AND r.usuario_id = $2"
+      params.push(userCheck.user.id)
+    }
+
+    queryText += " ORDER BY r.created_at DESC"
+
+    const result = await query(queryText, params)
 
     if (result.rowCount === 0) {
-      return NextResponse.json({ message: "No se encontraron reclamos" }, { status: 404 })
+      return NextResponse.json({
+        reclamos: [],
+        message: "no hay reclamos disponibles"
+      }, { status: 200 })
     }
 
     return NextResponse.json({
@@ -286,25 +352,16 @@ export async function PATCH(request: Request) {
           );
           if (solicitudCompletaResult.rowCount > 0) {
             const s = solicitudCompletaResult.rows[0];
-            const pdfDoc = await PDFDocument.create();
-            const page = pdfDoc.addPage([595, 842]); // A4
-            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-            const fontSize = 12;
-            let y = 780;
-            const drawLine = (label: string, value: any) => {
-              page.drawText(`${label}: ${value ?? "-"}`, { x: 50, y, size: fontSize, font });
-              y -= 20;
-            };
-            drawLine("ID", s.id);
-            drawLine("N° Expediente", s.numero_expediente);
-            drawLine("Tipo", s.tipo);
-            drawLine("Motivo", s.descripcion);
-            drawLine("Fecha Inicio", s.fecha_inicio);
-            drawLine("Fecha Fin", s.fecha_fin);
-            drawLine("Estado", "aprobada");
-            drawLine("Comentarios", s.comentarios);
-            drawLine("Usuario", s.usuario_nombre);
-            const pdfBytes = await pdfDoc.save();
+            const pdfBytes = await generarMemorandoPDF({
+              numeroExpediente: s.numero_expediente,
+              asunto: s.tipo,
+              fecha: new Date(s.updated_at || s.created_at).toLocaleDateString("es-PE"),
+              usuarioNombre: s.usuario_nombre,
+              razon: s.descripcion,
+              goceRemuneraciones: s.goce_remuneraciones,
+              cargo: s.cargo,
+              periodo: `${s.fecha_inicio} al ${s.fecha_fin}`
+            })
             const uploadsDir = path.join(process.cwd(), "public", "pdf");
             try {
               await mkdir(uploadsDir, { recursive: true });

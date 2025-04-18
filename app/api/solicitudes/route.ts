@@ -3,7 +3,63 @@ import { getCurrentUser } from "@/lib/auth"
 import { query } from "@/lib/db/postgres"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
-import { PDFDocument, StandardFonts } from "pdf-lib"
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
+
+// Función utilitaria para generar el memorando PDF con formato y mensaje
+async function generarMemorandoPDF({
+  numeroExpediente,
+  asunto,
+  fecha,
+  usuarioNombre,
+  razon,
+  goceRemuneraciones,
+  cargo,
+  periodo
+}: {
+  numeroExpediente: string,
+  asunto: string,
+  fecha: string,
+  usuarioNombre: string,
+  razon: string,
+  goceRemuneraciones: boolean,
+  cargo: string,
+  periodo: string
+}) {
+  const pdfDoc = await PDFDocument.create()
+  const page = pdfDoc.addPage([595, 842]) // A4
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  let y = 800
+
+  // Encabezado
+  page.drawText("UGEL ILO", { x: 50, y, size: 10, font: fontBold })
+  page.drawText("MEMORANDO", { x: 250, y, size: 16, font: fontBold })
+  y -= 30
+
+  // Datos principales
+  page.drawText(`Expediente: ${numeroExpediente}`, { x: 50, y, size: 12, font })
+  y -= 20
+  page.drawText(`Asunto: ${asunto}`, { x: 50, y, size: 12, font })
+  y -= 20
+  page.drawText(`Fecha: ${fecha}`, { x: 50, y, size: 12, font })
+  y -= 30
+
+  // Mensaje formal
+  const mensaje = `Por la presente se comunica al(la) Sr(a). ${usuarioNombre}, quien desempeña el cargo de ${cargo}, que se ha registrado la siguiente solicitud de licencia:\n\n` +
+    `- Razón: ${razon}\n` +
+    `- Tipo: ${goceRemuneraciones ? "Con goce de remuneraciones" : "Sin goce de remuneraciones"}\n` +
+    `- Período solicitado: ${periodo}\n\n` +
+    `Se le informa que la presente solicitud ha sido aprobada y se procederá conforme a la normativa vigente.\n\n` +
+    `Atentamente,\nUGEL ILO`
+
+  const lines = mensaje.split("\n")
+  for (const line of lines) {
+    page.drawText(line, { x: 50, y, size: 12, font })
+    y -= 18
+  }
+
+  return await pdfDoc.save()
+}
 
 export async function POST(request: Request) {
   try {
@@ -12,15 +68,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
-    // Variables para almacenar los datos del formulario
     let data: any = {}
     let archivo: File | null = null
+    let archivoUrl: string | null = null
 
-    // Procesar la solicitud según el tipo de contenido
     const contentType = request.headers.get('content-type') || ''
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData()
-      // Extraer todos los campos del FormData
       data = {
         tipo: (formData.get('tipo') || '').toString().trim(),
         motivo: (formData.get('motivo') || '').toString().trim(),
@@ -36,9 +90,25 @@ export async function POST(request: Request) {
       // Procesar archivo
       const archivoData = formData.get('archivo')
       archivo = archivoData instanceof File && archivoData.size > 0 ? archivoData : null
+
+      // Guardar archivo si existe
+      if (archivo) {
+        const buffer = Buffer.from(await archivo.arrayBuffer())
+        const safeName = archivo.name.replace(/[^a-z0-9.\-_]/gi, "_")
+        const filename = `${Date.now()}_${safeName}`
+        const uploadDir = path.join(process.cwd(), "public", "uploads")
+        await mkdir(uploadDir, { recursive: true })
+        const filePath = path.join(uploadDir, filename)
+        await writeFile(filePath, buffer)
+        archivoUrl = `/uploads/${filename}` // <-- Esta ruta se guarda en la base de datos
+      }
     } else {
       // Si es JSON, simplemente parseamos la solicitud
       data = await request.json()
+      // Si viene archivo_url desde el frontend (por ejemplo, subido previamente)
+      if (data.rutaAdjunto) {
+        archivoUrl = data.rutaAdjunto
+      }
     }
 
     // Validar campos requeridos
@@ -64,11 +134,6 @@ export async function POST(request: Request) {
 
     if (!userCheck.user) {
       return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
-    }
-
-    let archivoUrl = null
-    if (archivo) {
-      archivoUrl = archivo.name // puedes guardar el archivo si deseas
     }
 
     // Generar el número de expediente automáticamente con el formato "EXP-{año}-{número de 4 cifras}"
@@ -108,7 +173,7 @@ export async function POST(request: Request) {
         data.fechaInicio,
         data.fechaFin,
         "pendiente",
-        archivoUrl,
+        archivoUrl, // <-- Aquí se guarda la ruta del archivo
         numeroExpediente,
         data.celular,
         data.correo,
@@ -128,26 +193,16 @@ export async function POST(request: Request) {
     let pdfUrl = null
     if (solicitudCreada.estado === "aprobada") {
       try {
-        const pdfDoc = await PDFDocument.create()
-        const page = pdfDoc.addPage([595, 842])
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-        const fontSize = 12
-        let y = 780
-        const drawLine = (label: string, value: any) => {
-          page.drawText(`${label}: ${value ?? "-"}`, { x: 50, y, size: fontSize, font })
-          y -= 20
-        }
-        drawLine("ID", solicitudCreada.id)
-        drawLine("N° Expediente", solicitudCreada.numero_expediente)
-        drawLine("Tipo", solicitudCreada.tipo)
-        drawLine("Motivo", solicitudCreada.motivo)
-        drawLine("Fecha Inicio", solicitudCreada.fecha_inicio)
-        drawLine("Fecha Fin", solicitudCreada.fecha_fin)
-        drawLine("Estado", solicitudCreada.estado)
-        drawLine("Comentarios", solicitudCreada.comentarios)
-        // Si tienes el nombre del usuario, agrégalo aquí
-        drawLine("Usuario", "") 
-        const pdfBytes = await pdfDoc.save()
+        const pdfBytes = await generarMemorandoPDF({
+          numeroExpediente: solicitudCreada.numero_expediente,
+          asunto: solicitudCreada.tipo,
+          fecha: new Date(solicitudCreada.created_at).toLocaleDateString("es-PE"),
+          usuarioNombre: userCheck.user.nombre || "",
+          razon: solicitudCreada.motivo,
+          goceRemuneraciones: solicitudCreada.goce_remuneraciones,
+          cargo: solicitudCreada.cargo,
+          periodo: `${solicitudCreada.fecha_inicio} al ${solicitudCreada.fecha_fin}`
+        })
         const uploadsDir = path.join(process.cwd(), "public", "pdf")
         await mkdir(uploadsDir, { recursive: true })
         const filePath = path.join(uploadsDir, `solicitud_${solicitudCreada.id}.pdf`)

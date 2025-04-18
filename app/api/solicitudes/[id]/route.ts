@@ -3,7 +3,117 @@ import { query } from "@/lib/db/postgres" // Utiliza tu cliente de PostgreSQL
 import { getCurrentUser, verifyAdmin } from "@/lib/auth" // Para verificar el usuario y el rol
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
-import { PDFDocument, StandardFonts } from "pdf-lib"
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
+
+async function generarMemorandoPDF(s: any) {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]); // A4
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontSize = 12;
+  let y = 800;
+
+  // Encabezado institucional simulado
+  page.drawText("PERÚ | Ministerio de Educación", { x: 50, y, size: 10, font });
+  page.drawText("UGEL ILO", { x: 470, y, size: 10, font });
+  y -= 40;
+
+  // Título del memorando
+  const title = `MEMORANDUM N°${s.numero_expediente}-GREMO-DUGEILO-ADM`;
+  page.drawText(title, {
+    x: 595 / 2 - fontBold.widthOfTextAtSize(title, 14) / 2,
+    y,
+    size: 14,
+    font: fontBold,
+  });
+  y -= 30;
+
+  // Datos principales tipo oficio
+  const drawInfo = (label: string, value: string) => {
+    page.drawText(`${label}:`, { x: 50, y, size: fontSize, font: fontBold });
+    page.drawText(value ?? "-", { x: 180, y, size: fontSize, font });
+    y -= 20;
+  };
+
+  drawInfo("PARA", "RESPONSABLE DE PROYECTOS RESOLUCIÓN");
+  drawInfo("ASUNTO", "PROYECTAR RESOLUCIÓN");
+  drawInfo("REF", `EXPEDIENTE N°${s.numero_expediente}, INFORME N°340-2022-UGEL-ILO-ADM...`);
+  drawInfo("FECHA", `ILO, ${formatearFecha(s.fecha_fin)}`);
+
+  // Línea separadora
+  y -= 10;
+  page.drawLine({ start: { x: 50, y }, end: { x: 545, y }, thickness: 1, color: rgb(0, 0, 0) });
+  y -= 25;
+
+  // Cuerpo del memorando
+  const otorgarTexto = `Sirvase proyectar resolución, realizando la siguiente acción:
+
+1.- OTORGAR Licencia con Goce de Remuneraciones por ${s.tipo} a don(ña) ${
+    s.usuario_nombre
+  }, profesor(a) de la I.E. “Mariscal Andrés Avelino Cáceres”,
+jurisdicción de la Unidad de Gestión Educativa Local Ilo, conforme se detalla:`;
+
+  const drawMultiline = (text: string, x: number, width: number, lineHeight: number) => {
+    const lines = text.split("\n");
+    for (const line of lines) {
+      page.drawText(line.trim(), { x, y, size: fontSize, font });
+      y -= lineHeight;
+    }
+  };
+
+  drawMultiline(otorgarTexto, 50, 495, 16);
+
+  // Datos tipo tabla
+  y -= 10;
+
+  // Tabla: Empleador - EsSalud - Vigencia - CITT
+  page.drawText("TOTAL DÍAS A CARGO", { x: 60, y, size: fontSize - 1, font: fontBold });
+  page.drawText("Empleador", { x: 80, y: y - 15, size: fontSize - 1, font });
+  page.drawText("20", { x: 90, y: y - 30, size: fontSize, font });
+
+  page.drawText("EsSalud", { x: 160, y: y - 15, size: fontSize - 1, font });
+  page.drawText("8", { x: 170, y: y - 30, size: fontSize, font });
+
+  page.drawText("VIGENCIA", { x: 260, y, size: fontSize - 1, font: fontBold });
+  page.drawText(`${s.fecha_inicio} al ${s.fecha_fin}`, { x: 270, y: y - 20, size: fontSize, font });
+
+  page.drawText("N°. CITT/CERT. MED.", { x: 400, y, size: fontSize - 1, font: fontBold });
+  page.drawText("000000000", { x: 410, y: y - 20, size: fontSize, font });
+
+  y -= 60;
+
+  page.drawText("Atentamente,", { x: 50, y, size: fontSize, font });
+
+  // --- OPCIONAL: Información adicional al final tipo resumen ---
+  y -= 40;
+  const drawLine = (label: string, value: any) => {
+    page.drawText(`${label}:`, { x: 50, y, size: fontSize - 1, font: fontBold });
+    page.drawText(`${value ?? "-"}`, { x: 180, y, size: fontSize - 1, font });
+    y -= 18;
+  };
+
+  drawLine("ID", s.id);
+  drawLine("N° Expediente", s.numero_expediente);
+  drawLine("Tipo", s.tipo);
+  drawLine("Motivo", s.motivo || s.descripcion);
+  drawLine("Fecha Inicio", s.fecha_inicio);
+  drawLine("Fecha Fin", s.fecha_fin);
+  drawLine("Estado", "aprobada");
+  drawLine("Comentarios", s.comentarios);
+  drawLine("Usuario", s.usuario_nombre);
+
+  const pdfBytes = await pdfDoc.save();
+  return pdfBytes;
+}
+
+function formatearFecha(fechaStr: string): string {
+  const fecha = new Date(fechaStr);
+  return fecha.toLocaleDateString("es-PE", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -116,28 +226,23 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     let pdfUrl = null
     if (estado === "aprobada") {
       try {
-        const pdfDoc = await PDFDocument.create()
-        const page = pdfDoc.addPage([595, 842])
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-        const fontSize = 12
-        let y = 780
-        const drawLine = (label: string, value: any) => {
-          page.drawText(`${label}: ${value ?? "-"}`, { x: 50, y, size: fontSize, font })
-          y -= 20
+        // Obtener datos completos de la solicitud y usuario
+        const solicitudCompletaResult = await query(
+          `SELECT s.*, u.nombre as usuario_nombre
+           FROM solicitudes s
+           JOIN usuarios u ON s.usuario_id = u.id
+           WHERE s.id = $1`,
+          [id]
+        );
+        if (solicitudCompletaResult.rowCount > 0) {
+          const s = solicitudCompletaResult.rows[0];
+          const pdfBytes = await generarMemorandoPDF(s);
+          const uploadsDir = path.join(process.cwd(), "public", "pdf");
+          await mkdir(uploadsDir, { recursive: true });
+          const filePath = path.join(uploadsDir, `solicitud_${s.id}.pdf`);
+          await writeFile(filePath, pdfBytes);
+          pdfUrl = `/pdf/solicitud_${s.id}.pdf`
         }
-        drawLine("ID", solicitud.id)
-        drawLine("N° Expediente", solicitud.numero_expediente)
-        drawLine("Tipo", solicitud.tipo)
-        drawLine("Motivo", solicitud.motivo)
-        drawLine("Estado", estado)
-        drawLine("Comentarios", comentarios)
-        drawLine("Usuario", "") 
-        const pdfBytes = await pdfDoc.save()
-        const uploadsDir = path.join(process.cwd(), "public", "pdf")
-        await mkdir(uploadsDir, { recursive: true })
-        const filePath = path.join(uploadsDir, `solicitud_${solicitud.id}.pdf`)
-        await writeFile(filePath, pdfBytes)
-        pdfUrl = `/pdf/solicitud_${solicitud.id}.pdf`
       } catch (err) {
         console.error("Error generando PDF al aprobar solicitud:", err)
       }

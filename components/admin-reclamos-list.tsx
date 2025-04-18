@@ -38,12 +38,16 @@ interface Reclamo {
   }
 }
 
+interface AdminReclamosListProps {
+  status?: string
+}
+
 const formatDate = (date: string) => {
   const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" }
   return new Date(date).toLocaleDateString(undefined, options)
 }
 
-export default function AdminReclamosList() {
+export default function AdminReclamosList({ status }: AdminReclamosListProps = {}) {
   const [reclamos, setReclamos] = useState<Reclamo[]>([])
   const [selectedReclamo, setSelectedReclamo] = useState<Reclamo | null>(null)
   const [respuesta, setRespuesta] = useState("")  // Renombrado de comentarios a respuesta
@@ -53,7 +57,9 @@ export default function AdminReclamosList() {
   useEffect(() => {
     const fetchReclamos = async () => {
       try {
-        const res = await fetch("/api/reclamos")
+        // Usar el status si viene como prop, si no, traer todos (pendiente por defecto)
+        const url = status ? `/api/reclamos?estado=${status}` : "/api/reclamos"
+        const res = await fetch(url)
         if (!res.ok) throw new Error("Error al cargar reclamos")
         const data = await res.json()
         setReclamos(data.reclamos || [])
@@ -63,7 +69,7 @@ export default function AdminReclamosList() {
       }
     }
     fetchReclamos()
-  }, [])
+  }, [status])
 
   const updateReclamoEstado = async (estado: "aprobado" | "rechazado") => {
     if (!selectedReclamo) return
@@ -121,7 +127,7 @@ export default function AdminReclamosList() {
           {error}
         </div>
       )}
-      <div className="rounded-md">
+      <div className="rounded-md bg-list">
         <Table>
           <TableHeader>
             <TableRow>
