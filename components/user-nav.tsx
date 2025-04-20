@@ -26,6 +26,12 @@ export function UserNav() {
 
   const userImage = "/placeholder.svg?height=32&width=32"
 
+  // Estilos para admin: fondo y borde más notorio
+  const isAdmin = user?.role === "admin"
+  const avatarClass = isAdmin
+    ? "h-8 w-8 ring-2 ring-yellow-400 bg-yellow-100 text-yellow-800"
+    : "h-8 w-8"
+
   const handleLogout = async () => {
     try {
       await logout()
@@ -38,9 +44,15 @@ export function UserNav() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
+          <Avatar className={avatarClass}>
             <AvatarImage src={userImage} alt={user.name} />
-            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback>
+              {isAdmin ? (
+                <span className="font-bold">ADM</span>
+              ) : (
+                user.name.charAt(0)
+              )}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>

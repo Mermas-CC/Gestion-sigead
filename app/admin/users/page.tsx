@@ -20,6 +20,7 @@ interface User {
   id: number
   nombre: string
   email: string
+  dni?: string | null // <-- Añadido
   departamento: string | null
   rol: string
   activo: boolean

@@ -15,9 +15,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 export default function NewUserPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
+    dni: "",
     department: "",
     role: "user",
     isActive: true,
@@ -90,21 +92,25 @@ export default function NewUserPage() {
       }
     }
 
-      // Crear FormData para envío con archivo
-  const body = new FormData()
-  body.append("name", formData.name)
-  body.append("email", formData.email)
-  body.append("password", formData.password)
-  body.append("department", formData.department || "")
-  body.append("role", formData.role || "user")
-  body.append("isActive", formData.isActive ? "true" : "false")
-  body.append("phone", formData.phone || "")
-  body.append("position", formData.position || "")
-  body.append("contractTypeId", formData.contractTypeId)
-  body.append("careerLevelId", formData.careerLevelId)
-  if (formData.contractFile) {
-    body.append("contractFile", formData.contractFile)
-  }
+    // Unir nombre y apellido antes de enviar
+    const fullName = `${formData.firstName} ${formData.lastName}`.trim()
+
+    // Crear FormData para envío con archivo
+    const body = new FormData()
+    body.append("name", fullName)
+    body.append("email", formData.email)
+    body.append("password", formData.password)
+    body.append("dni", formData.dni)
+    body.append("department", formData.department || "")
+    body.append("role", formData.role || "user")
+    body.append("isActive", formData.isActive ? "true" : "false")
+    body.append("phone", formData.phone || "")
+    body.append("position", formData.position || "")
+    body.append("contractTypeId", formData.contractTypeId)
+    body.append("careerLevelId", formData.careerLevelId)
+    if (formData.contractFile) {
+      body.append("contractFile", formData.contractFile)
+    }
 
     try {
       const response = await fetch("/api/admin/users", {
@@ -114,10 +120,6 @@ export default function NewUserPage() {
 
       const data = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.message || "Error al crear el usuario")
-      }
-      
       if (!response.ok) {
         throw new Error(data.message || "Error al crear el usuario")
       }
@@ -159,8 +161,16 @@ export default function NewUserPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Campos de información del usuario */}
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
-                <Input name="name" value={formData.name} onChange={handleChange} required />
+                <Label htmlFor="firstName">Nombre</Label>
+                <Input name="firstName" value={formData.firstName} onChange={handleChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Apellido</Label>
+                <Input name="lastName" value={formData.lastName} onChange={handleChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dni">DNI</Label>
+                <Input name="dni" value={formData.dni} onChange={handleChange} required maxLength={15} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>

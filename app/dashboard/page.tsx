@@ -30,7 +30,7 @@ export default function DashboardPage() {
   return (
     <div className="container py-8">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Panel Principal</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Sistema de Gestión Administrativo</h1>
         <div className="flex gap-2">
           <NuevaSolicitudButton />
           <NuevoReclamoButton />

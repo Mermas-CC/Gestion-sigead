@@ -14,9 +14,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 export default function RegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
+    dni: "",
     department: "",
     phone: "",
     position: "",
@@ -84,11 +86,15 @@ export default function RegisterPage() {
       }
     }
 
+    // Unir nombre y apellido antes de enviar
+    const fullName = `${formData.firstName} ${formData.lastName}`.trim()
+
     // Crear FormData para envío con archivo
     const body = new FormData()
-    body.append("name", formData.name)
+    body.append("name", fullName)
     body.append("email", formData.email)
     body.append("password", formData.password)
+    body.append("dni", formData.dni)
     body.append("department", formData.department || "")
     body.append("phone", formData.phone || "")
     body.append("position", formData.position || "")
@@ -150,8 +156,16 @@ export default function RegisterPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
-                <Input name="name" value={formData.name} onChange={handleChange} required />
+                <Label htmlFor="firstName">Nombre</Label>
+                <Input name="firstName" value={formData.firstName} onChange={handleChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Apellido</Label>
+                <Input name="lastName" value={formData.lastName} onChange={handleChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dni">DNI</Label>
+                <Input name="dni" value={formData.dni} onChange={handleChange} required maxLength={15} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>

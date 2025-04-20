@@ -6,6 +6,7 @@ import AdminReclamosList from "@/components/admin-reclamos-list"
 import { UserPlus, Users, FileText, Clock } from "lucide-react"
 import Link from "next/link"
 import { query, testConnection } from "@/lib/db"
+import { UserNav } from "@/components/user-nav" // <-- Importa el UserNav
 
 // Interfaces para las estadísticas
 interface DashboardStats {
@@ -122,7 +123,8 @@ export default async function AdminDashboardPage() {
     }
     return (
     <div className="container py-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+      {/* Barra superior con UserNav */}
+      <div className="flex flex-row items-center justify-between mb-6">
         <div>
           <div className="flex flex-row items-center gap-6 mb-2">
             <img src="/logo.png" alt="Logo Plataforma" className="h-12 w-auto" />
@@ -130,7 +132,8 @@ export default async function AdminDashboardPage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Panel de Administración</h1>
         </div>
-        <div className="flex gap-4">
+        <div className="flex items-center gap-4">
+          {/* Botones de acciones */}
           <Button asChild>
             <Link href="/admin/users/new">
               <UserPlus className="mr-2 h-4 w-4" />
@@ -143,6 +146,8 @@ export default async function AdminDashboardPage() {
               Gestionar Usuarios
             </Link>
           </Button>
+          {/* Barra de usuario */}
+          <UserNav />
         </div>
       </div>
 

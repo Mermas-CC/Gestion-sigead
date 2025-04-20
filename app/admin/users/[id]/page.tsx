@@ -69,6 +69,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     setError("")
     const body = new FormData()
     body.append("name", formData.nombre)
+    body.append("dni", formData.dni || "")
     body.append("email", formData.email)
     if (formData.password) body.append("password", formData.password)
     body.append("department", formData.departamento || "")
@@ -125,6 +126,10 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               <div className="space-y-2">
                 <Label htmlFor="nombre">Nombre Completo</Label>
                 <Input name="nombre" value={formData.nombre} onChange={handleChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dni">DNI</Label>
+                <Input name="dni" value={formData.dni || ""} onChange={handleChange} required maxLength={15} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>

@@ -30,6 +30,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const name = formData.get("name")?.toString() || "";
     const email = formData.get("email")?.toString() || "";
     const password = formData.get("password")?.toString() || "";
+    const dni = formData.get("dni")?.toString() || "";
     const department = formData.get("department")?.toString() || null;
     const role = (formData.get("role")?.toString() || "user").toLowerCase();
     const isActive = formData.has("isActive") ? formData.get("isActive") === "true" : true;
@@ -40,7 +41,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const contractFile = formData.get("contractFile") as File | null;
 
     // Validar campos obligatorios
-    if (!name || !email || !contractTypeId || !careerLevelId) {
+    if (!name || !email || !dni || !contractTypeId || !careerLevelId) {
       return NextResponse.json({ message: "Faltan campos obligatorios" }, { status: 400 });
     }
 
@@ -60,17 +61,19 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     let updateFields = [
       "nombre = $1",
       "email = $2",
-      "departamento = $3",
-      "rol = $4",
-      "activo = $5",
-      "telefono = $6",
-      "cargo = $7",
-      "tipo_contrato_id = $8",
-      "nivel_carrera_id = $9"
+      "dni = $3",
+      "departamento = $4",
+      "rol = $5",
+      "activo = $6",
+      "telefono = $7",
+      "cargo = $8",
+      "tipo_contrato_id = $9",
+      "nivel_carrera_id = $10"
     ];
     let values = [
       name,
       email,
+      dni,
       department,
       role === "admin" ? "admin" : "user",
       isActive,
@@ -79,7 +82,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       contractTypeId,
       careerLevelId
     ];
-    let idx = 10;
+    let idx = 11;
 
     if (contractUrl) {
       updateFields.push(`contrato_url = $${idx}`);

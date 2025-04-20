@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     const name = formData.get("name")?.toString() || "";
     const email = formData.get("email")?.toString() || "";
     const password = formData.get("password")?.toString() || "";
+    const dni = formData.get("dni")?.toString() || ""; // <-- Añadido
     const department = formData.get("department")?.toString() || null;
     // Si viene desde el panel admin, puede venir el rol y activo, si no, por defecto
     const role = (formData.get("role")?.toString() || "user").toLowerCase();
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     const contractFile = formData.get("contractFile") as File | null;
 
     // Validar campos obligatorios
-    if (!name || !email || !password || !contractTypeId || !careerLevelId) {
+    if (!name || !email || !password || !dni || !contractTypeId || !careerLevelId) {
       return NextResponse.json({ message: "Faltan campos obligatorios" }, { status: 400 });
     }
 
@@ -85,14 +86,15 @@ export async function POST(request: Request) {
     // Insertar el nuevo usuario en la base de datos
     const result = await query(
       `INSERT INTO usuarios 
-         (nombre, email, password, departamento, rol, activo, telefono, cargo, contrato_url, tipo_contrato_id, nivel_carrera_id)
+         (nombre, email, password, dni, departamento, rol, activo, telefono, cargo, contrato_url, tipo_contrato_id, nivel_carrera_id)
        VALUES 
-         ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       RETURNING id, nombre, email, departamento, rol, activo, telefono, cargo, contrato_url, tipo_contrato_id, nivel_carrera_id`,
+         ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING id, nombre, email, dni, departamento, rol, activo, telefono, cargo, contrato_url, tipo_contrato_id, nivel_carrera_id`,
       [
         name,
         email,
         hashedPassword,
+        dni, // <-- Añadido
         department,
         // Si el registro es público, siempre "user"
         role === "admin" ? "admin" : "user",
