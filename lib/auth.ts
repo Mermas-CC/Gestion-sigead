@@ -5,34 +5,37 @@ import { supabase } from "./supabaseClient"
 // Verificar token JWT
 export async function verifyToken(request: Request) {
   try {
-    // Obtener token de las cookies o del header Authorization
+    // Obtener token del header Authorization o de las cookies
     let token: string | undefined
 
-    // Primero intentar obtener de las cookies
-    const cookieStore = await cookies()
-    console.log('All cookies:', cookieStore.getAll())
-    
-    const authCookie = cookieStore.get("auth_token")
-    console.log('Auth cookie:', authCookie)
-    token = authCookie?.value
+    // Primero intentar obtener del header Authorization
+    const authHeader = request.headers.get("Authorization")
+    console.log('Authorization header:', authHeader)
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1]
+    }
 
-    // Si no hay token en las cookies, intentar obtener del header Authorization
+    // Si no hay token en el header, intentar obtener de las cookies
     if (!token) {
-      console.log('No token in cookies, checking Authorization header')
-      const authHeader = request.headers.get("Authorization")
-      console.log('Authorization header:', authHeader)
-      if (authHeader?.startsWith("Bearer ")) {
-        token = authHeader.split(" ")[1]
+      console.log('No token in Authorization header, checking cookies')
+      try {
+        const cookieStore = cookies()
+        const authCookie = cookieStore.get("auth_token")
+        console.log('Auth cookie:', authCookie)
+        token = authCookie?.value
+      } catch (cookieError) {
+        console.error('Error accessing cookies:', cookieError)
+        // Continue without cookie - we might be in a context where cookies are not available
       }
     }
 
-    console.log('Final token found:', token)
+    console.log('Final token found:', token ? 'yes' : 'no')
 
     if (!token) {
       return { success: false, message: "No autorizado", status: 401 }
     }
 
-    // Verificar token de cookie
+    // Verificar token
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_fallback") as jwt.JwtPayload
       console.log('Decoded token:', decoded)
