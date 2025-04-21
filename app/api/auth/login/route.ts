@@ -1,27 +1,30 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import jwt from "jsonwebtoken"
-import { query } from "@/lib/db/postgres"
+import { supabase } from "@/lib/supabaseClient"
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
 
     console.log('Login attempt:', { email })
+    console.log('Login attempt:', { email })
 
-    // Buscar usuario en la base de datos
-    const result = await query(
-      "SELECT id, nombre, email, rol FROM usuarios WHERE email = $1 AND password = $2 AND activo = true",
-      [email, password]
-    )
+    // Buscar usuario en la base de datos usando Supabase
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('id, nombre, email, rol')
+      .eq('email', email)
+      .eq('password', password)
+      .eq('activo', true)
+      .single()
 
-    console.log('Query result:', { rowCount: result.rowCount })
+    console.log('Query result:', { data: data ? 'found' : 'not found', error: error?.message })
 
-    if (result.rowCount === 0) {
+    if (!data || error) {
       return NextResponse.json({ message: "Credenciales inválidas" }, { status: 401 })
     }
-
-    const user = result.rows[0]
+    const user = data
     console.log('User found:', { id: user.id, email: user.email, rol: user.rol })
 
     // Crear token JWT
@@ -64,9 +67,6 @@ export async function POST(request: Request) {
     )
 
     return response
-
-    console.log('Token set in cookie:', token)
-
 
   } catch (error) {
     console.error("Error en login:", error)

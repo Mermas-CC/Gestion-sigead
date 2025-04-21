@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { query } from "@/lib/db/postgres"
+import { supabase } from "@/lib/supabaseClient"
 
 export async function GET(request: Request) {
   try {
@@ -14,21 +14,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
     }
 
-    // Obtener notificaciones del usuario
-    const result = await query(
-      `SELECT id, titulo, mensaje, leida, created_at
-       FROM notificaciones
-       WHERE usuario_id = $1
-       ORDER BY created_at DESC`,
-      [userCheck.user.id]
-    )
-
-    if (!result) {
-      console.error("Error al obtener notificaciones")
+    // Obtener notificaciones del usuario usando Supabase
+    const { data, error } = await supabase
+      .from('notificaciones')
+      .select('id, titulo, mensaje, leida, created_at')
+      .eq('usuario_id', userCheck.user.id)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error("Error al obtener notificaciones:", error)
       return NextResponse.json({ message: "Error al obtener notificaciones" }, { status: 500 })
     }
 
-    const notificaciones = result.rows.map((n) => ({
+    const notificaciones = data.map((n) => ({
       id: n.id,
       titulo: n.titulo,
       mensaje: n.mensaje,
@@ -58,16 +56,16 @@ export async function PATCH(request: Request) {
     }
 
     if (id) {
-      const result = await query(
-        `UPDATE notificaciones
-         SET leida = $1
-         WHERE id = $2 AND usuario_id = $3
-         RETURNING id`,
-        [leida !== undefined ? leida : true, id, userCheck.user.id]
-      )
-
-      if (!result || result.rowCount === 0) {
-        console.error("Error al actualizar notificación")
+      // Actualizar una notificación específica con Supabase
+      const { data, error } = await supabase
+        .from('notificaciones')
+        .update({ leida: leida !== undefined ? leida : true })
+        .eq('id', id)
+        .eq('usuario_id', userCheck.user.id)
+        .select('id')
+      
+      if (error || !data || data.length === 0) {
+        console.error("Error al actualizar notificación:", error)
         return NextResponse.json({ message: "Error al actualizar notificación" }, { status: 500 })
       }
 
@@ -79,16 +77,16 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
       }
 
-      const result = await query(
-        `UPDATE notificaciones
-         SET leida = true
-         WHERE usuario_id = $1 AND leida = false
-         RETURNING id`,
-        [userCheck.user.id]
-      )
-
-      if (!result) {
-        console.error("Error al actualizar notificaciones")
+      // Actualizar todas las notificaciones no leídas del usuario con Supabase
+      const { data, error } = await supabase
+        .from('notificaciones')
+        .update({ leida: true })
+        .eq('usuario_id', userCheck.user.id)
+        .eq('leida', false)
+        .select('id')
+      
+      if (error) {
+        console.error("Error al actualizar notificaciones:", error)
         return NextResponse.json({ message: "Error al actualizar notificaciones" }, { status: 500 })
       }
 

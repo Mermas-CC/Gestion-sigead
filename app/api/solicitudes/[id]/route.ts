@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db/postgres" // Utiliza tu cliente de PostgreSQL
+import { supabase } from "@/lib/supabaseClient"
 import { getCurrentUser, verifyAdmin } from "@/lib/auth" // Para verificar el usuario y el rol
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
@@ -125,21 +125,28 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const id = params.id
 
-    // Consulta base para obtener la solicitud
-    const { rows } = await query(
-      `SELECT 
-        id, numero_expediente, tipo, motivo, fecha_inicio, fecha_fin, estado, comentarios, 
-        fecha_solicitud, fecha_actualizacion,
-        usuario_id, (SELECT nombre FROM usuarios WHERE id = usuario_id) AS usuario_nombre
-       FROM solicitudes WHERE id = $1`,
-      [id]
-    )
-
-    if (rows.length === 0) {
+    // Consulta base para obtener la solicitud con Supabase
+    const { data, error } = await supabase
+      .from('solicitudes')
+      .select(`
+        id, numero_expediente, tipo, descripcion, fecha_inicio, fecha_fin, estado, comentarios, 
+        created_at, updated_at,
+        usuario_id, usuarios(nombre)
+      `)
+      .eq('id', id)
+      .single()
+    
+    if (error || !data) {
       return NextResponse.json({ message: "Solicitud no encontrada" }, { status: 404 })
     }
 
-    const solicitud = rows[0]
+    const solicitud = {
+      ...data,
+      usuario_nombre: data.usuarios?.nombre,
+      motivo: data.descripcion,
+      fecha_solicitud: data.created_at,
+      fecha_actualizacion: data.updated_at
+    }
 
     // Si no es admin, verificar que la solicitud pertenezca al usuario
     if (userCheck.user.role !== "admin" && solicitud.usuario_id !== userCheck.user.id) {
@@ -204,38 +211,52 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: "Estado no válido" }, { status: 400 })
     }
 
-    // Consultar solicitud en la base de datos
-    const result = await query(
-      `SELECT id, usuario_id, numero_expediente, tipo, motivo FROM solicitudes WHERE id = $1`,
-      [id]
-    )
+    // Consultar solicitud en la base de datos con Supabase
+    const { data: solicitudData, error: solicitudError } = await supabase
+      .from('solicitudes')
+      .select('id, usuario_id, numero_expediente, tipo, descripcion')
+      .eq('id', id)
+      .single()
 
-    if (!result.rows.length) {
+    if (solicitudError || !solicitudData) {
       return NextResponse.json({ message: "Solicitud no encontrada" }, { status: 404 })
     }
 
-    const solicitud = result.rows[0]
+    const solicitud = {
+      ...solicitudData,
+      motivo: solicitudData.descripcion
+    }
 
-    // Actualizar estado de la solicitud
-    await query(
-      `UPDATE solicitudes SET estado = $1, comentarios = $2, fecha_actualizacion = NOW() WHERE id = $3`,
-      [estado, comentarios, id]
-    )
+    // Actualizar estado de la solicitud con Supabase
+    const { error: updateError } = await supabase
+      .from('solicitudes')
+      .update({ 
+        estado: estado, 
+        comentarios: comentarios, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', id)
 
     // Crear la notificación
     let pdfUrl = null
     if (estado === "aprobada") {
       try {
-        // Obtener datos completos de la solicitud y usuario
-        const solicitudCompletaResult = await query(
-          `SELECT s.*, u.nombre as usuario_nombre
-           FROM solicitudes s
-           JOIN usuarios u ON s.usuario_id = u.id
-           WHERE s.id = $1`,
-          [id]
-        );
-        if (solicitudCompletaResult.rowCount > 0) {
-          const s = solicitudCompletaResult.rows[0];
+        // Obtener datos completos de la solicitud y usuario con Supabase
+        const { data: solicitudCompleta, error: solicitudCompletaError } = await supabase
+          .from('solicitudes')
+          .select(`
+            *,
+            usuarios(nombre)
+          `)
+          .eq('id', id)
+          .single();
+          
+        if (!solicitudCompletaError && solicitudCompleta) {
+          const s = {
+            ...solicitudCompleta,
+            usuario_nombre: solicitudCompleta.usuarios?.nombre,
+            motivo: solicitudCompleta.descripcion
+          };
           const pdfBytes = await generarMemorandoPDF(s);
           const uploadsDir = path.join(process.cwd(), "public", "pdf");
           await mkdir(uploadsDir, { recursive: true });
@@ -253,14 +274,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (estado === "aprobada" && pdfUrl) {
       mensajeNotificacion += ` <a href="${pdfUrl}" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: bold;">Ver Memorando</a>`
     }
-    await query(
-      `INSERT INTO notificaciones (usuario_id, titulo, mensaje) VALUES ($1, $2, $3)`,
-      [
-        solicitud.usuario_id,
-        `Solicitud ${estadoTexto}`,
-        mensajeNotificacion,
-      ]
-    )
+    // Crear notificación con Supabase
+    const { error: notificacionError } = await supabase
+      .from('notificaciones')
+      .insert({
+        usuario_id: solicitud.usuario_id,
+        titulo: `Solicitud ${estadoTexto}`,
+        mensaje: mensajeNotificacion
+      })
+    
+    if (notificacionError) {
+      console.error("Error al crear notificación:", notificacionError)
+    }
 
     return NextResponse.json({
       message: `Solicitud ${estadoTexto} exitosamente`,

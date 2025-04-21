@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { query } from "@/lib/db/postgres"
+import { supabase } from "@/lib/supabaseClient"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
@@ -71,48 +71,51 @@ export async function GET(request: Request) {
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
-
+    
     // Filtrar por usuario si no es admin
-    let queryText = `
-      SELECT 
-        r.*, 
-        s.numero_expediente AS solicitud_numero_expediente,
-        s.tipo AS solicitud_tipo,
-        s.fecha_inicio AS solicitud_fecha_inicio,
-        s.fecha_fin AS solicitud_fecha_fin,
-        s.estado AS solicitud_estado
-      FROM reclamos r
-      LEFT JOIN solicitudes s ON r.solicitud_id = s.id
-      WHERE r.estado = $1
-    `
-    const params: any[] = [estado]
-
+    let query = supabase
+      .from('reclamos')
+      .select(`
+        *,
+        solicitudes (
+          numero_expediente,
+          tipo,
+          fecha_inicio,
+          fecha_fin,
+          estado
+        )
+      `)
+      .eq('estado', estado)
+      .order('created_at', { ascending: false })
+    
     if (userCheck.user.role !== "admin") {
-      queryText += " AND r.usuario_id = $2"
-      params.push(userCheck.user.id)
+      query = query.eq('usuario_id', userCheck.user.id)
     }
 
-    queryText += " ORDER BY r.created_at DESC"
-
-    const result = await query(queryText, params)
-
-    if (result.rowCount === 0) {
+    const { data, error } = await query
+    
+    if (error) {
+      console.error("Error al obtener reclamos:", error)
+      return NextResponse.json({ message: "Error al obtener reclamos" }, { status: 500 })
+    }
+    
+    if (!data || data.length === 0) {
       return NextResponse.json({
         reclamos: [],
-        message: "no hay reclamos disponibles"
+        message: "No hay reclamos disponibles"
       }, { status: 200 })
     }
 
     return NextResponse.json({
-      reclamos: result.rows.map(r => ({
+      reclamos: data.map(r => ({
         ...r,
-        solicitud: {
-          numeroExpediente: r.solicitud_numero_expediente,
-          tipo: r.solicitud_tipo,
-          fechaInicio: r.solicitud_fecha_inicio,
-          fechaFin: r.solicitud_fecha_fin,
-          estado: r.solicitud_estado,
-        }
+        solicitud: r.solicitudes ? {
+          numeroExpediente: r.solicitudes.numero_expediente,
+          tipo: r.solicitudes.tipo,
+          fechaInicio: r.solicitudes.fecha_inicio,
+          fechaFin: r.solicitudes.fecha_fin,
+          estado: r.solicitudes.estado,
+        } : null
       }))
     })
 
@@ -169,16 +172,18 @@ export async function POST(request: Request) {
     }
 
     if (data.solicitudId) {
-      const solicitudQuery = await query(
-        `SELECT estado, created_at FROM solicitudes WHERE id = $1`,
-        [data.solicitudId]
-      )
-
-      if (solicitudQuery.rowCount === 0) {
+      // Verificar si la solicitud existe con Supabase
+      const { data: solicitudData, error: solicitudError } = await supabase
+        .from('solicitudes')
+        .select('estado, created_at')
+        .eq('id', data.solicitudId)
+        .single()
+      
+      if (solicitudError || !solicitudData) {
         return NextResponse.json({ message: "La solicitud no existe." }, { status: 404 })
       }
-
-      const { estado, created_at } = solicitudQuery.rows[0]
+      
+      const { estado, created_at } = solicitudData
       const tresDiasEnMs = 3 * 24 * 60 * 60 * 1000
       const fechaCreacion = new Date(created_at)
       const ahora = new Date()
@@ -193,52 +198,51 @@ export async function POST(request: Request) {
         }, { status: 400 })
       }
 
-      const reclamoExistente = await query(
-        `SELECT 1 FROM reclamos WHERE solicitud_id = $1 AND usuario_id = $2`,
-        [data.solicitudId, userCheck.user.id]
-      )
-
-      if (reclamoExistente.rowCount > 0) {
+      // Verificar si ya existe un reclamo para esta solicitud con Supabase
+      const { data: reclamoExistente, error: reclamoExistenteError } = await supabase
+        .from('reclamos')
+        .select('id')
+        .eq('solicitud_id', data.solicitudId)
+        .eq('usuario_id', userCheck.user.id)
+        .maybeSingle()
+      
+      if (reclamoExistente) {
         return NextResponse.json({
           message: "Ya has registrado un reclamo para esta solicitud.",
         }, { status: 400 })
       }
     }
 
-    const result = await query(
-      `INSERT INTO reclamos (
-        solicitud_id,
-        usuario_id,
-        mensaje,
-        archivo_url,
-        estado
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, solicitud_id, mensaje, archivo_url, estado, created_at`,
-      [
-        data.solicitudId || null,
-        userCheck.user.id,
-        data.descripcion,
-        archivoUrl || null,
-        'pendiente'
-      ]
-    )
-
-    if (result.rowCount === 0) {
+    // Insertar reclamo con Supabase
+    const { data: reclamoCreado, error: insertError } = await supabase
+      .from('reclamos')
+      .insert({
+        solicitud_id: data.solicitudId || null,
+        usuario_id: userCheck.user.id,
+        mensaje: data.descripcion,
+        archivo_url: archivoUrl || null,
+        estado: 'pendiente'
+      })
+      .select('id, solicitud_id, mensaje, archivo_url, estado, created_at')
+      .single()
+    
+    if (insertError || !reclamoCreado) {
+      console.error("Error al registrar reclamo:", insertError)
       return NextResponse.json({ message: "Error al registrar el reclamo" }, { status: 500 })
     }
 
-    const reclamoCreado = result.rows[0]
-
-    await query(
-      `INSERT INTO notificaciones (usuario_id, titulo, mensaje)
-       VALUES ($1, $2, $3)`,
-      [
-        userCheck.user.id,
-        "Reclamo registrado",
-        `Tu reclamo para la solicitud #${data.solicitudId || "sin solicitud"} ha sido registrado y está pendiente de revisión.`
-      ]
-    )
+    // Crear notificación con Supabase
+    const { error: notificacionError } = await supabase
+      .from('notificaciones')
+      .insert({
+        usuario_id: userCheck.user.id,
+        titulo: "Reclamo registrado",
+        mensaje: `Tu reclamo para la solicitud #${data.solicitudId || "sin solicitud"} ha sido registrado y está pendiente de revisión.`
+      })
+    
+    if (notificacionError) {
+      console.error("Error al crear notificación:", notificacionError)
+    }
 
     return NextResponse.json({
       reclamo: {
@@ -267,59 +271,47 @@ export async function PATCH(request: Request) {
     }
 
     const { id, estado, respuesta, solicitudId } = await request.json();
-
-    let result;
+    // Preparar datos para la actualización
+    let updateData: any = {
+      estado: estado,
+      respuesta: respuesta,
+      updated_at: new Date().toISOString()
+    };
+    
+    // Si viene solicitudId, incluirlo en la actualización
+    // Si viene solicitudId, incluirlo en la actualización
     if (typeof solicitudId !== "undefined") {
-      // Si viene solicitudId, actualiza también ese campo
-      result = await query(
-        `
-          UPDATE reclamos 
-          SET estado = $1, respuesta = $2, updated_at = NOW(), solicitud_id = $4
-          WHERE id = $3
-          RETURNING *
-        `,
-        [estado, respuesta, id, solicitudId]
-      );
-    } else {
-      // Si no viene solicitudId, no lo actualices
-      result = await query(
-        `
-          UPDATE reclamos 
-          SET estado = $1, respuesta = $2, updated_at = NOW()
-          WHERE id = $3
-          RETURNING *
-        `,
-        [estado, respuesta, id]
-      );
+      updateData.solicitud_id = solicitudId;
     }
-
-    if (result.rowCount === 0) {
+    // Actualizar el reclamo con Supabase
+    const { data: reclamoData, error: updateError } = await supabase
+      .from('reclamos')
+      .update(updateData)
+      .eq('id', id)
+      .select('*')
+      .single();
+    
+    if (updateError || !reclamoData) {
       console.log("No se encontró el reclamo para actualizar:", id);
       return NextResponse.json({ message: "Reclamo no encontrado" }, { status: 404 });
     }
-
-    const reclamo = result.rows[0];
-    console.log("Reclamo actualizado:", reclamo);
-
-    // Obtener información de la solicitud asociada SOLO si existe solicitud_id
+    
+    const reclamo = reclamoData;
     if (reclamo.solicitud_id) {
       console.log("Buscando solicitud asociada con ID:", reclamo.solicitud_id);
-      const solicitudResult = await query(
-        `
-          SELECT id, numero_expediente, estado, usuario_id 
-          FROM solicitudes 
-          WHERE id = $1
-        `,
-        [reclamo.solicitud_id]
-      );
-
-      if (solicitudResult.rowCount === 0) {
+      // Obtener solicitud con Supabase
+      const { data: solicitudData, error: solicitudError } = await supabase
+        .from('solicitudes')
+        .select('id, numero_expediente, estado, usuario_id')
+        .eq('id', reclamo.solicitud_id)
+        .single();
+      
+      if (solicitudError || !solicitudData) {
         console.log("No se encontró la solicitud asociada:", reclamo.solicitud_id);
         return NextResponse.json({ message: "Solicitud asociada no encontrada" }, { status: 404 });
       }
-
-      const solicitud = solicitudResult.rows[0];
-      console.log("Solicitud asociada encontrada:", solicitud);
+      
+      const solicitud = solicitudData;
 
       // Comparar estado ignorando mayúsculas/minúsculas y espacios
       console.log("Estado actual de la solicitud:", solicitud.estado, "| Estado esperado: 'rechazada'");
@@ -329,29 +321,41 @@ export async function PATCH(request: Request) {
         solicitud.estado.trim().toLowerCase() === "rechazada"
       ) {
         console.log("Actualizando solicitud a 'aprobada'...");
-        await query(
-          `
-            UPDATE solicitudes 
-            SET estado = 'aprobada', updated_at = NOW()
-            WHERE id = $1
-          `,
-          [solicitud.id]
-        );
-        console.log("Solicitud actualizada a 'aprobada'");
-
+        console.log("Actualizando solicitud a 'aprobada'...");
+        const { error: updateSolicitudError } = await supabase
+          .from('solicitudes')
+          .update({ 
+            estado: 'aprobada', 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', solicitud.id);
+          
+        if (updateSolicitudError) {
+          console.error("Error al actualizar la solicitud:", updateSolicitudError);
+        }
         // --- Generar el memorando PDF al aprobar el reclamo ---
         let pdfUrl = null
         try {
-          // Obtener datos completos de la solicitud y usuario
-          const solicitudCompletaResult = await query(
-            `SELECT s.*, u.nombre as usuario_nombre
-             FROM solicitudes s
-             JOIN usuarios u ON s.usuario_id = u.id
-             WHERE s.id = $1`,
-            [solicitud.id]
-          );
-          if (solicitudCompletaResult.rowCount > 0) {
-            const s = solicitudCompletaResult.rows[0];
+          // Obtener datos completos de la solicitud y usuario con Supabase
+          const { data: solicitudCompleta, error: solicitudCompletaError } = await supabase
+            .from('solicitudes')
+            .select(`
+              *,
+              usuarios (
+                nombre
+              )
+            `)
+            .eq('id', solicitud.id)
+            .single();
+            
+          if (!solicitudCompletaError && solicitudCompleta) {
+            const s = {
+              ...solicitudCompleta,
+              usuario_nombre: solicitudCompleta.usuarios?.nombre,
+              descripcion: solicitudCompleta.descripcion
+            };
+            
+            // Generar el PDF
             const pdfBytes = await generarMemorandoPDF({
               numeroExpediente: s.numero_expediente,
               asunto: s.tipo,
@@ -361,7 +365,7 @@ export async function PATCH(request: Request) {
               goceRemuneraciones: s.goce_remuneraciones,
               cargo: s.cargo,
               periodo: `${s.fecha_inicio} al ${s.fecha_fin}`
-            })
+            });
             const uploadsDir = path.join(process.cwd(), "public", "pdf");
             try {
               await mkdir(uploadsDir, { recursive: true });
@@ -389,17 +393,18 @@ export async function PATCH(request: Request) {
         if (pdfUrl) {
           mensajeNotificacion += ` <a href="${pdfUrl}" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: bold;">Ver Memorando</a>`
         }
-        await query(
-          `
-            INSERT INTO notificaciones (usuario_id, titulo, mensaje)
-            VALUES ($1, $2, $3)
-          `,
-          [
-            solicitud.usuario_id,
-            "Solicitud aprobada",
-            mensajeNotificacion,
-          ]
-        );
+        // Crear notificación con Supabase
+        const { error: notificacionError } = await supabase
+          .from('notificaciones')
+          .insert({
+            usuario_id: solicitud.usuario_id,
+            titulo: "Solicitud aprobada",
+            mensaje: mensajeNotificacion
+          });
+          
+        if (notificacionError) {
+          console.error("Error al crear notificación de solicitud aprobada:", notificacionError);
+        }
       } else {
         console.log("No se cumplen condiciones para actualizar la solicitud.");
       }
@@ -411,13 +416,18 @@ export async function PATCH(request: Request) {
           ? `Tu reclamo para la solicitud con expediente ${solicitud.numero_expediente} ha sido aprobado. Respuesta: ${respuesta || "Sin respuesta"}`
           : `Tu reclamo para la solicitud con expediente ${solicitud.numero_expediente} ha sido rechazado. Respuesta: ${respuesta || "Sin respuesta"}`;
 
-      await query(
-        `
-          INSERT INTO notificaciones (usuario_id, titulo, mensaje)
-          VALUES ($1, $2, $3)
-        `,
-        [solicitud.usuario_id, titulo, mensaje]
-      );
+      // Crear notificación con Supabase
+      const { error: notificacionReclamoError } = await supabase
+        .from('notificaciones')
+        .insert({
+          usuario_id: solicitud.usuario_id,
+          titulo: titulo,
+          mensaje: mensaje
+        });
+        
+      if (notificacionReclamoError) {
+        console.error("Error al crear notificación de estado de reclamo:", notificacionReclamoError);
+      }
     } else {
       console.log("El reclamo no tiene solicitud_id asociado.");
     }

@@ -24,11 +24,17 @@ export default function BotonSolicitudVacaciones() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // Simulación de userId, reemplázalo por un valor real de contexto de usuario autenticado
-    const userId = 8 // Esto debería ser dinámico, basado en el usuario autenticado
-
     const fetchPermissions = async () => {
       try {
+        // Obtener el usuario autenticado
+        const userResponse = await fetch('/api/auth/me')
+        if (!userResponse.ok) throw new Error('Error al obtener el usuario autenticado')
+        const userData = await userResponse.json()
+
+        const userId = userData.user?.id
+        if (!userId) throw new Error('No se pudo obtener el ID del usuario')
+
+        // Consultar permisos del usuario
         const response = await fetch(`/api/user/permissions?userId=${userId}`)
         if (!response.ok) throw new Error('Error al obtener permisos')
         const data = await response.json()
@@ -56,26 +62,31 @@ export default function BotonSolicitudVacaciones() {
     e.preventDefault()
     setLoading(true)
 
-    // Aquí obtienes el ID del usuario autenticado (puedes adaptarlo según el sistema de autenticación)
-    const userId = 8 // Este valor debe ser dinámico, basado en el contexto del usuario autenticado
-
-    const formData = new FormData()
-    formData.append('tipo', 'vacaciones') // Valor por defecto
-    formData.append('motivo', 'Vacaciones solicitadas') // Valor por defecto
-    formData.append('fechaInicio', form.fecha_inicio)
-    formData.append('fechaFin', form.fecha_fin)
-    formData.append('celular', form.celular)
-    formData.append('correo', form.correo)
-    formData.append('cargo', form.cargo)
-    formData.append('institucion', form.institucion)
-    formData.append('goceRemuneraciones', 'true') // Valor por defecto (vacaciones)
-    formData.append('comentarios', form.comentario)
-
-    if (form.archivo) {
-      formData.append('archivo', form.archivo)
-    }
-
     try {
+      // Obtener el usuario autenticado
+      const userResponse = await fetch('/api/auth/me')
+      if (!userResponse.ok) throw new Error('Error al obtener el usuario autenticado')
+      const userData = await userResponse.json()
+
+      const userId = userData.user?.id
+      if (!userId) throw new Error('No se pudo obtener el ID del usuario')
+
+      const formData = new FormData()
+      formData.append('tipo', 'vacaciones') // Valor por defecto
+      formData.append('motivo', 'Vacaciones solicitadas') // Valor por defecto
+      formData.append('fechaInicio', form.fecha_inicio)
+      formData.append('fechaFin', form.fecha_fin)
+      formData.append('celular', form.celular)
+      formData.append('correo', form.correo)
+      formData.append('cargo', form.cargo)
+      formData.append('institucion', form.institucion)
+      formData.append('goceRemuneraciones', 'true') // Valor por defecto (vacaciones)
+      formData.append('comentarios', form.comentario)
+
+      if (form.archivo) {
+        formData.append('archivo', form.archivo)
+      }
+
       const res = await fetch('/api/solicitudes', {
         method: 'POST',
         body: formData,

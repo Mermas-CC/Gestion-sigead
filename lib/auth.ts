@@ -1,6 +1,6 @@
 import { cookies } from "next/headers"
 import jwt from "jsonwebtoken"
-import { query } from "./db/postgres"
+import { supabase } from "./supabaseClient"
 
 // Verificar token JWT
 export async function verifyToken(request: Request) {
@@ -79,16 +79,17 @@ export async function getCurrentUser(request: Request) {
   }
 
   try {
-    const result = await query(
-      "SELECT id, nombre, email, departamento, rol, activo FROM usuarios WHERE id = $1",
-      [tokenCheck.user.id]
-    )
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('id, nombre, email, departamento, rol, activo')
+      .eq('id', tokenCheck.user.id)
+      .single()
 
-    if (result.rowCount === 0) {
+    if (error || !data) {
       return { success: false, message: "Usuario no encontrado", status: 404 }
     }
 
-    const user = result.rows[0]
+    const user = data
 
     return {
       success: true,

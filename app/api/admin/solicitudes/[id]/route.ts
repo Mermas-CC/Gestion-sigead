@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db/postgres"
+import { supabase } from "@/lib/supabaseClient"
 import { getCurrentUser } from "@/lib/auth"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
@@ -18,14 +18,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 })
     }
 
-    const result = await query(`
-      SELECT solicitudes.*, usuarios.nombre 
-      FROM solicitudes 
-      JOIN usuarios ON solicitudes.usuario_id = usuarios.id
-      ORDER BY solicitudes.created_at DESC
-    `)
+    const { data, error } = await supabase
+      .from('solicitudes')
+      .select(`
+        *,
+        usuarios (
+          id,
+          nombre
+        )
+      `)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error("Error al obtener solicitudes:", error)
+      return NextResponse.json({ message: "Error al obtener solicitudes" }, { status: 500 })
+    }
 
-    return NextResponse.json({ solicitudes: result.rows })
+    return NextResponse.json({ solicitudes: data })
   } catch (error) {
     console.error("Error al obtener solicitudes:", error)
     return NextResponse.json({ message: "Error al obtener solicitudes" }, { status: 500 })
@@ -46,37 +55,39 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     }
 
     const { estado, comentarios } = await request.json()
-    const result = await query(
-      `
-        UPDATE solicitudes 
-        SET estado = $1, comentarios = $2, updated_at = NOW()
-        WHERE id = $3
-        RETURNING *
-      `,
-      [estado, comentarios, params.id]
-    )
+    
+    // Actualizar solicitud con Supabase
+    const { data: solicitudData, error: updateError } = await supabase
+      .from('solicitudes')
+      .update({ 
+        estado: estado, 
+        comentarios: comentarios, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', params.id)
+      .select()
+      .single()
 
-    if (result.rowCount === 0) {
+    if (updateError || !solicitudData) {
+      console.error("Error al actualizar solicitud:", updateError)
       return NextResponse.json({ message: "Solicitud no encontrada" }, { status: 404 })
     }
 
-    const solicitud = result.rows[0]
+    const solicitud = solicitudData
 
-    // Obtener información del usuario
-    const userResult = await query(
-      `
-        SELECT id, nombre, cargo 
-        FROM usuarios 
-        WHERE id = $1
-      `,
-      [solicitud.usuario_id]
-    )
+    // Obtener información del usuario con Supabase
+    const { data: userData, error: userError } = await supabase
+      .from('usuarios')
+      .select('id, nombre, cargo')
+      .eq('id', solicitud.usuario_id)
+      .single()
 
-    if (userResult.rowCount === 0) {
+    if (userError || !userData) {
+      console.error("Error al obtener usuario:", userError)
       return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
     }
 
-    const usuario = userResult.rows[0]
+    const usuario = userData
 
     let pdfUrl = null
 
@@ -210,13 +221,18 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       mensaje = `Tu solicitud ${solicitud.numero_expediente} ha sido rechazada.`
     }
 
-    await query(
-      `
-        INSERT INTO notificaciones (usuario_id, titulo, mensaje)
-        VALUES ($1, $2, $3)
-      `,
-      [usuario.id, titulo, mensaje]
-    )
+    // Crear notificación con Supabase
+    const { error: notificacionError } = await supabase
+      .from('notificaciones')
+      .insert({
+        usuario_id: usuario.id,
+        titulo: titulo,
+        mensaje: mensaje
+      })
+    
+    if (notificacionError) {
+      console.error("Error al crear notificación:", notificacionError)
+    }
 
     return NextResponse.json({ message: `Solicitud ${estado} exitosamente`, pdfUrl })
   } catch (error) {

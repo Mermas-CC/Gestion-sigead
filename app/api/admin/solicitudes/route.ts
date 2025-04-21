@@ -1,6 +1,6 @@
 // app/api/admin/solicitudes/route.ts (o pages/api/admin/solicitudes.ts para Next.js 12 o anterior)
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db/postgres"
+import { supabase } from "@/lib/supabaseClient"
 import { getCurrentUser } from "@/lib/auth"
 
 export async function GET(request: Request) {
@@ -22,56 +22,51 @@ export async function GET(request: Request) {
     const params: any[] = []
     const conditions: string[] = []
 
-    // Query para obtener todas las solicitudes
-    let sqlQuery = `
-      SELECT 
-  s.id, 
-  s.numero_expediente, 
-  s.tipo, 
-  s.descripcion, 
-  s.fecha_inicio, 
-  s.fecha_fin,
-  s.estado, 
-  s.created_at, 
-  s.updated_at,
-  s.celular,
-  s.correo,
-  s.cargo,
-  s.institucion,
-  s.goce_remuneraciones,
-  s.comentarios,
-  s.archivo_url,
-  u.id as usuario_id, 
-  u.nombre as usuario_nombre, 
-  u.departamento as usuario_departamento,
-  u.contrato_url  -- Aquí agregas la ruta del contrato
-FROM solicitudes s
-JOIN usuarios u ON s.usuario_id = u.id
-
-    `
+    // Preparar la consulta con Supabase
+    let query = supabase
+      .from('solicitudes')
+      .select(`
+        id, 
+        numero_expediente, 
+        tipo, 
+        descripcion, 
+        fecha_inicio, 
+        fecha_fin,
+        estado, 
+        created_at, 
+        updated_at,
+        celular,
+        correo,
+        cargo,
+        institucion,
+        goce_remuneraciones,
+        comentarios,
+        archivo_url,
+        usuario_id,
+        usuarios (
+          id,
+          nombre,
+          departamento,
+          contrato_url
+        )
+      `)
+      .order('created_at', { ascending: false })
 
     // Si se especifica un estado, filtrar por el estado
     if (estado) {
-      conditions.push(`s.estado = $${params.length + 1}`)
-      params.push(estado)
+      query = query.eq('estado', estado)
     }
 
-    // Agregar condiciones a la query
-    if (conditions.length > 0) {
-      sqlQuery += " WHERE " + conditions.join(" AND ")
-    }
+    // Ejecutar la consulta
+    const { data: solicitudesData, error } = await query
 
-    // Ordenar por fecha de creación
-    sqlQuery += " ORDER BY s.created_at DESC"
-
-    const result = await query(sqlQuery, params)
-
-    if (!result) {
+    if (error) {
+      console.error("Error al obtener solicitudes:", error)
       return NextResponse.json({ message: "Error al obtener solicitudes" }, { status: 500 })
     }
 
     // Mapear resultados
-    const solicitudes = result.rows.map((s) => ({
+    const solicitudes = solicitudesData.map((s) => ({
       id: s.id,
       numeroExpediente: s.numero_expediente,
       tipo: s.tipo,
@@ -88,11 +83,11 @@ JOIN usuarios u ON s.usuario_id = u.id
       goceRemuneraciones: s.goce_remuneraciones,
       comentarios: s.comentarios,
       rutaAdjunto: s.archivo_url,
-      contratoUrl: s.contrato_url,  // Asegúrate de incluir el contrato URL
+      contratoUrl: s.usuarios?.contrato_url,  // Asegúrate de incluir el contrato URL
       usuario: {
         id: s.usuario_id,
-        nombre: s.usuario_nombre,
-        departamento: s.usuario_departamento,
+        nombre: s.usuarios?.nombre,
+        departamento: s.usuarios?.departamento,
       }
     }))
     

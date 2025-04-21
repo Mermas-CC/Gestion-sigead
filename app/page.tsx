@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -51,9 +53,15 @@ export default function Home() {
           <Button asChild size="lg">
             <Link href="/login">Iniciar Sesión</Link>
           </Button>
-          {/* Botón de registro */}
           <Button asChild size="lg" variant="outline">
             <Link href="/register">Registrarse</Link>
+          </Button>
+          <Button
+            size="lg"
+            variant="ghost"
+            onClick={() => window.open('/manual.pdf', '_blank')}
+          >
+            Ver Manual
           </Button>
         </div>
       </div>

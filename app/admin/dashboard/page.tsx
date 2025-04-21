@@ -5,7 +5,7 @@ import { AdminSolicitudesList } from "@/components/admin-solicitudes-list"
 import AdminReclamosList from "@/components/admin-reclamos-list"
 import { UserPlus, Users, FileText, Clock } from "lucide-react"
 import Link from "next/link"
-import { query, testConnection } from "@/lib/db"
+import { supabase } from "@/lib/supabaseClient"
 import { UserNav } from "@/components/user-nav" // <-- Importa el UserNav
 
 // Interfaces para las estadísticas
@@ -21,61 +21,95 @@ interface DashboardStats {
 // Función para obtener las estadísticas del dashboard
 async function getDashboardStats(): Promise<DashboardStats> {
   try {
-    // Probar la conexión primero
-    const isConnected = await testConnection();
-    if (!isConnected) {
-      throw new Error('No se pudo establecer conexión con la base de datos');
-    }
+    console.log('Iniciando consultas con Supabase...');
 
-    console.log('Conexión exitosa, iniciando consultas...');
-
-    // Consulta única para obtener todas las estadísticas
-    console.log('Ejecutando consulta unificada de estadísticas...');
-    const statsResult = await query(`
-      WITH stats AS (
-        SELECT 
-          COUNT(*) as total_solicitudes,
-          COUNT(CASE WHEN LOWER(estado) = 'pendiente' THEN 1 END) as total_pendientes,
-          COUNT(CASE WHEN tipo IN ('capacitacion_oficial', 'salud') THEN 1 END) as total_con_goce,
-          COUNT(CASE WHEN tipo IN ('capacitacion_no_oficial', 'personal') THEN 1 END) as total_sin_goce,
-          COUNT(CASE WHEN tipo = 'capacitacion_oficial' THEN 1 END) as cap_oficial,
-          COUNT(CASE WHEN tipo = 'salud' THEN 1 END) as salud,
-          COUNT(CASE WHEN tipo = 'capacitacion_no_oficial' THEN 1 END) as cap_no_oficial,
-          COUNT(CASE WHEN tipo = 'personal' THEN 1 END) as personal
-        FROM solicitudes
-      )
-      SELECT * FROM stats;
-    `);
-
-    console.log('Resultado completo de estadísticas:', statsResult.rows[0]);
-
-    // Si no hay resultados, devolvemos estadísticas por defecto
-    if (!statsResult.rows || statsResult.rows.length === 0) {
-      console.warn('No se encontraron resultados en la consulta');
-      return getDefaultStats();
-    }
-
-    // Extraer los datos de la consulta
-    const row = statsResult.rows[0];
+    // Obtener el total de solicitudes
+    const { count: totalSolicitudes, error: totalError } = await supabase
+      .from('solicitudes')
+      .select('*', { count: 'exact', head: true });
     
+    if (totalError) {
+      console.error('Error al obtener total de solicitudes:', totalError);
+      throw new Error('Error al obtener estadísticas de solicitudes');
+    }
+
+    // Obtener solicitudes pendientes
+    const { count: pendientes, error: pendientesError } = await supabase
+      .from('solicitudes')
+      .select('*', { count: 'exact', head: true })
+      .eq('estado', 'pendiente');
+    
+    if (pendientesError) {
+      console.error('Error al obtener solicitudes pendientes:', pendientesError);
+      throw new Error('Error al obtener estadísticas de solicitudes pendientes');
+    }
+
+    // Obtener solicitudes con goce - capacitación oficial
+    const { count: capOficial, error: capOficialError } = await supabase
+      .from('solicitudes')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo', 'capacitacion_oficial');
+    
+    if (capOficialError) {
+      console.error('Error al obtener solicitudes de capacitación oficial:', capOficialError);
+      throw new Error('Error al obtener estadísticas de licencias');
+    }
+
+    // Obtener solicitudes con goce - salud
+    const { count: salud, error: saludError } = await supabase
+      .from('solicitudes')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo', 'salud');
+    
+    if (saludError) {
+      console.error('Error al obtener solicitudes de salud:', saludError);
+      throw new Error('Error al obtener estadísticas de licencias');
+    }
+
+    // Obtener solicitudes sin goce - capacitación no oficial
+    const { count: capNoOficial, error: capNoOficialError } = await supabase
+      .from('solicitudes')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo', 'capacitacion_no_oficial');
+    
+    if (capNoOficialError) {
+      console.error('Error al obtener solicitudes de capacitación no oficial:', capNoOficialError);
+      throw new Error('Error al obtener estadísticas de licencias');
+    }
+
+    // Obtener solicitudes sin goce - personal
+    const { count: personal, error: personalError } = await supabase
+      .from('solicitudes')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo', 'personal');
+    
+    if (personalError) {
+      console.error('Error al obtener solicitudes personales:', personalError);
+      throw new Error('Error al obtener estadísticas de licencias');
+    }
+
+    // Calcular totales con goce y sin goce
+    const conGoce = (capOficial || 0) + (salud || 0);
+    const sinGoce = (capNoOficial || 0) + (personal || 0);
+
     // Construir objeto de tipos con goce
     const tiposConGoce: Record<string, number> = {
-      'capacitacion_oficial': parseInt(row.cap_oficial) || 0,
-      'salud': parseInt(row.salud) || 0
+      'capacitacion_oficial': capOficial || 0,
+      'salud': salud || 0
     };
 
     // Construir objeto de tipos sin goce
     const tiposSinGoce: Record<string, number> = {
-      'capacitacion_no_oficial': parseInt(row.cap_no_oficial) || 0,
-      'personal': parseInt(row.personal) || 0
+      'capacitacion_no_oficial': capNoOficial || 0,
+      'personal': personal || 0
     };
 
     // Crear objeto de respuesta
     const stats = {
-      totalSolicitudes: parseInt(row.total_solicitudes) || 0,
-      pendientes: parseInt(row.total_pendientes) || 0,
-      conGoce: parseInt(row.total_con_goce) || 0,
-      sinGoce: parseInt(row.total_sin_goce) || 0,
+      totalSolicitudes: totalSolicitudes || 0,
+      pendientes: pendientes || 0,
+      conGoce,
+      sinGoce,
       tiposConGoce,
       tiposSinGoce
     };

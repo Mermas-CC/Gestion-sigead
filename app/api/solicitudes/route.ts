@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { query } from "@/lib/db/postgres"
+import { supabase } from "@/lib/supabaseClient"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
@@ -138,56 +138,53 @@ export async function POST(request: Request) {
 
     // Generar el número de expediente automáticamente con el formato "EXP-{año}-{número de 4 cifras}"
     const currentYear = new Date().getFullYear()
-    const expedienteQuery = await query(
-      `SELECT COUNT(*) AS count FROM solicitudes WHERE EXTRACT(YEAR FROM created_at) = $1`,
-      [currentYear]
-    )
-    const expedienteCount = parseInt(expedienteQuery.rows[0].count) + 1
+    
+    // Usar Supabase para contar expedientes del año actual
+    const { data: expedienteData, error: expedienteError } = await supabase
+      .from('solicitudes')
+      .select('id', { count: 'exact' })
+      .gte('created_at', `${currentYear}-01-01`)
+      .lte('created_at', `${currentYear}-12-31`)
+    
+    if (expedienteError) {
+      console.error("Error al obtener conteo de expedientes:", expedienteError)
+      return NextResponse.json({ message: "Error al generar número de expediente" }, { status: 500 })
+    }
+    
+    const expedienteCount = (expedienteData ? expedienteData.length : 0) + 1
     const numeroExpediente = `EXP-${currentYear}-${expedienteCount.toString().padStart(4, '0')}`
 
-    // Insertar la solicitud con el número de expediente generado
-    // Insertar la solicitud con todos los campos
-    const result = await query(
-      `INSERT INTO solicitudes (
-        usuario_id, 
-        tipo, 
-        descripcion, 
-        fecha_inicio, 
-        fecha_fin, 
-        estado, 
-        archivo_url, 
-        numero_expediente,
-        celular,
-        correo,
-        cargo,
-        institucion,
-        goce_remuneraciones,
-        comentarios
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING id, numero_expediente, tipo, descripcion as motivo, fecha_inicio, fecha_fin, estado, archivo_url, created_at, celular, correo, cargo, institucion, goce_remuneraciones, comentarios`,
-      [
-        userCheck.user.id,
-        data.tipo,
-        data.motivo,
-        data.fechaInicio,
-        data.fechaFin,
-        "pendiente",
-        archivoUrl, // <-- Aquí se guarda la ruta del archivo
-        numeroExpediente,
-        data.celular,
-        data.correo,
-        data.cargo,
-        data.institucion,
-        data.goceRemuneraciones,
-        data.comentarios || ""
-      ]
-    )
-    if (result.rowCount === 0) {
+    // Insertar la solicitud con Supabase
+    const { data: insertData, error: insertError } = await supabase
+      .from('solicitudes')
+      .insert({
+        usuario_id: userCheck.user.id,
+        tipo: data.tipo,
+        descripcion: data.motivo,
+        fecha_inicio: data.fechaInicio,
+        fecha_fin: data.fechaFin,
+        estado: "pendiente",
+        archivo_url: archivoUrl,
+        numero_expediente: numeroExpediente,
+        celular: data.celular,
+        correo: data.correo,
+        cargo: data.cargo,
+        institucion: data.institucion,
+        goce_remuneraciones: data.goceRemuneraciones,
+        comentarios: data.comentarios || ""
+      })
+      .select('id, numero_expediente, tipo, descripcion, fecha_inicio, fecha_fin, estado, archivo_url, created_at, celular, correo, cargo, institucion, goce_remuneraciones, comentarios')
+      .single()
+    
+    if (insertError || !insertData) {
+      console.error("Error al crear solicitud:", insertError)
       return NextResponse.json({ message: "Error al crear solicitud" }, { status: 500 })
     }
-
-    const solicitudCreada = result.rows[0]
+    
+    const solicitudCreada = {
+      ...insertData,
+      motivo: insertData.descripcion
+    }
 
     // --- Generar PDF si la solicitud es aprobada al crearla (caso raro, pero cubierto) ---
     let pdfUrl = null
@@ -214,15 +211,18 @@ export async function POST(request: Request) {
     }
     // --- Fin generación PDF ---
 
-    await query(
-      `INSERT INTO notificaciones (usuario_id, titulo, mensaje)
-       VALUES ($1, $2, $3)`,
-      [
-        userCheck.user.id,
-        "Solicitud creada",
-        `Tu solicitud #${solicitudCreada.id} ha sido creada y está pendiente de revisión.`
-      ]
-    )
+    // Crear notificación con Supabase
+    const { error: notificacionError } = await supabase
+      .from('notificaciones')
+      .insert({
+        usuario_id: userCheck.user.id,
+        titulo: "Solicitud creada",
+        mensaje: `Tu solicitud #${solicitudCreada.id} ha sido creada y está pendiente de revisión.`
+      })
+    
+    if (notificacionError) {
+      console.error("Error al crear notificación:", notificacionError)
+    }
 
     return NextResponse.json({
       solicitud: {
@@ -266,64 +266,59 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const estado = searchParams.get("estado")
 
-    // Inicializar el array de parámetros y condiciones
-    const params: any[] = []
-    const conditions: string[] = []
-
-    // Query base
-    let sqlQuery = `
-      SELECT 
-        s.id, 
-        s.numero_expediente, 
-        s.tipo, 
-        s.descripcion, 
-        s.fecha_inicio, 
-        s.fecha_fin,
-        s.estado, 
-        s.created_at, 
-        s.updated_at,
-        s.celular,
-        s.correo,
-        s.cargo,
-        s.institucion,
-        s.goce_remuneraciones,
-        s.comentarios,
-        s.archivo_url,
-        u.id as usuario_id, 
-        u.nombre as usuario_nombre, 
-        u.departamento as usuario_departamento
-      FROM solicitudes s
-      JOIN usuarios u ON s.usuario_id = u.id
-    `
-
+    // Iniciar consulta con Supabase
+    let query = supabase
+      .from('solicitudes')
+      .select(`
+        id,
+        numero_expediente,
+        tipo,
+        descripcion,
+        fecha_inicio,
+        fecha_fin,
+        estado,
+        created_at,
+        updated_at,
+        celular,
+        correo,
+        cargo,
+        institucion,
+        goce_remuneraciones,
+        comentarios,
+        archivo_url,
+        usuario_id,
+        usuarios (
+          id,
+          nombre,
+          departamento
+        )
+      `)
+      .order('created_at', { ascending: false })
+    
     // Agregar condición de usuario si no es admin
     if (userCheck.user.role !== "admin") {
-      conditions.push(`s.usuario_id = $${params.length + 1}`)
-      params.push(userCheck.user.id)
+      query = query.eq('usuario_id', userCheck.user.id)
     }
 
     // Agregar condición de estado si se especifica
     if (estado) {
-      conditions.push(`s.estado = $${params.length + 1}`)
-      params.push(estado)
+      query = query.eq('estado', estado)
     }
 
-    // Agregar condiciones a la query
-    if (conditions.length > 0) {
-      sqlQuery += " WHERE " + conditions.join(" AND ")
-    }
+    // Ejecutar la consulta
+    const { data: solicitudesData, error } = await query
 
-    // Ordenar por fecha de creación
-    sqlQuery += " ORDER BY s.created_at DESC"
-
-    const result = await query(sqlQuery, params)
-
-    if (!result) {
+    if (error) {
+      console.error("Error al obtener solicitudes:", error)
       return NextResponse.json({ message: "Error al obtener solicitudes" }, { status: 500 })
+    }
+    
+    if (!solicitudesData) {
+      return NextResponse.json({ solicitudes: [] })
     }
 
     // Mapear resultados
-    const solicitudes = result.rows.map((s) => ({
+    const solicitudes = solicitudesData.map((s) => ({
       id: s.id,
       numeroExpediente: s.numero_expediente,
       tipo: s.tipo,
@@ -342,8 +337,8 @@ export async function GET(request: Request) {
       rutaAdjunto: s.archivo_url,
       usuario: userCheck.user.role === "admin" ? {
         id: s.usuario_id,
-        nombre: s.usuario_nombre,
-        departamento: s.usuario_departamento,
+        nombre: s.usuarios?.nombre,
+        departamento: s.usuarios?.departamento,
       } : undefined
     }))
 

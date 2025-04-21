@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { query } from "@/lib/db/postgres"
+import { supabase } from "@/lib/supabaseClient"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { PDFDocument, StandardFonts } from "pdf-lib"
@@ -141,16 +141,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
+
     const { id } = params
-
-    const reclamoQuery = await query(`SELECT * FROM reclamos WHERE id = $1`, [id])
-
-    if (reclamoQuery.rowCount === 0) {
+    // Obtener reclamo con Supabase
+    const { data, error } = await supabase
+      .from('reclamos')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error || !data) {
       return NextResponse.json({ message: "Reclamo no encontrado" }, { status: 404 })
     }
-
-    const reclamo = reclamoQuery.rows[0]
-
+    
+    const reclamo = data
     return NextResponse.json({
       id: reclamo.id,
       solicitudId: reclamo.solicitud_id,
@@ -188,19 +192,32 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }, { status: 400 })
     }
 
-    const updateQuery = await query(
-      `UPDATE reclamos
-       SET respuesta = COALESCE($1, respuesta), estado = COALESCE($2, estado), updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3
-       RETURNING id, solicitud_id, mensaje, archivo_url, estado, respuesta, created_at`,
-      [data.respuesta, data.estado, id]
-    )
-
-    if (updateQuery.rowCount === 0) {
+    // Preparar los datos de actualización
+    const updateData: any = {};
+    
+    if (data.respuesta !== undefined) {
+      updateData.respuesta = data.respuesta;
+    }
+    
+    if (data.estado !== undefined) {
+      updateData.estado = data.estado;
+    }
+    
+    updateData.updated_at = new Date().toISOString();
+    
+    // Actualizar reclamo con Supabase
+    const { data: reclamoData, error: updateError } = await supabase
+      .from('reclamos')
+      .update(updateData)
+      .eq('id', id)
+      .select('id, solicitud_id, mensaje, archivo_url, estado, respuesta, created_at')
+      .single();
+    
+    if (updateError || !reclamoData) {
       return NextResponse.json({ message: "Reclamo no encontrado o no se pudo actualizar" }, { status: 404 })
     }
-
-    const reclamoActualizado = updateQuery.rows[0]
+    
+    const reclamoActualizado = reclamoData
 
     // --- Lógica para actualizar la solicitud asociada ---
     if (
@@ -208,31 +225,40 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       reclamoActualizado.solicitud_id
     ) {
       // Obtener la solicitud asociada
-      const solicitudResult = await query(
-        `SELECT id, estado, numero_expediente, tipo, descripcion, fecha_inicio, fecha_fin, comentarios, usuario_id, goce_remuneraciones, cargo, updated_at, created_at FROM solicitudes WHERE id = $1`,
-        [reclamoActualizado.solicitud_id]
-      )
+      // Obtener solicitud con Supabase
+      const { data: solicitudData, error: solicitudError } = await supabase
+        .from('solicitudes')
+        .select('id, estado, numero_expediente, tipo, descripcion, fecha_inicio, fecha_fin, comentarios, usuario_id, goce_remuneraciones, cargo, updated_at, created_at')
+        .eq('id', reclamoActualizado.solicitud_id)
+        .single();
+        
       if (
-        solicitudResult.rowCount > 0 &&
-        typeof solicitudResult.rows[0].estado === "string" &&
-        solicitudResult.rows[0].estado.trim().toLowerCase() === "rechazada"
+        !solicitudError && 
+        solicitudData &&
+        typeof solicitudData.estado === "string" &&
+        solicitudData.estado.trim().toLowerCase() === "rechazada"
       ) {
-        // Actualizar la solicitud a "aprobada"
-        await query(
-          `UPDATE solicitudes SET estado = 'aprobada', updated_at = NOW() WHERE id = $1`,
-          [reclamoActualizado.solicitud_id]
-        )
+        // Actualizar la solicitud a "aprobada" con Supabase
+        const { error: updateSolicitudError } = await supabase
+          .from('solicitudes')
+          .update({ 
+            estado: 'aprobada', 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', reclamoActualizado.solicitud_id);
 
         // --- Generar PDF del memorando con el mismo diseño que admin/solicitudes ---
         let pdfUrl = null
         try {
-          const s = solicitudResult.rows[0]
-          // Obtener nombre del usuario
-          const userResult = await query(
-            `SELECT nombre FROM usuarios WHERE id = $1`,
-            [s.usuario_id]
-          )
-          const usuarioNombre = userResult.rowCount > 0 ? userResult.rows[0].nombre : "Desconocido"
+          const s = solicitudData
+          // Obtener nombre del usuario con Supabase
+          const { data: userData, error: userError } = await supabase
+            .from('usuarios')
+            .select('nombre')
+            .eq('id', s.usuario_id)
+            .single();
+            
+          const usuarioNombre = userData?.nombre || "Desconocido";
           const pdfBytes = await generarMemorandoPDF({
             numeroExpediente: s.numero_expediente,
             asunto: s.tipo,
@@ -254,21 +280,25 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         // --- Fin generación PDF ---
 
         // Notificación con enlace al memorando
-        let mensajeNotificacion = `Tu solicitud con expediente ${solicitudResult.rows[0].numero_expediente} ha sido aprobada tras la revisión de tu reclamo.`
+        let mensajeNotificacion = `Tu solicitud con expediente ${solicitudData.numero_expediente} ha sido aprobada tras la revisión de tu reclamo.`
+        
+        // Añadir enlace al PDF si existe
         if (pdfUrl) {
           mensajeNotificacion += ` <a href="${pdfUrl}" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: bold;">Ver Memorando</a>`
         }
-        await query(
-          `
-            INSERT INTO notificaciones (usuario_id, titulo, mensaje)
-            VALUES ($1, $2, $3)
-          `,
-          [
-            solicitudResult.rows[0].usuario_id,
-            "Solicitud aprobada",
-            mensajeNotificacion,
-          ]
-        )
+        
+        // Crear notificación con Supabase
+        const { error: notificacionError } = await supabase
+          .from('notificaciones')
+          .insert({
+            usuario_id: solicitudData.usuario_id,
+            titulo: "Solicitud aprobada",
+            mensaje: mensajeNotificacion
+          });
+          
+        if (notificacionError) {
+          console.error("Error al crear notificación:", notificacionError);
+        }
       }
     }
     // --- Fin lógica solicitud asociada ---
