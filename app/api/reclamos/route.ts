@@ -71,6 +71,10 @@ export async function GET(request: Request) {
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
+
+    if (!userCheck.user) {
+      return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
+    }
     
     // Filtrar por usuario si no es admin
     let query = supabase
@@ -131,6 +135,10 @@ export async function POST(request: Request) {
     const userCheck = await getCurrentUser(request)
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
+    }
+
+    if (!userCheck.user) {
+      return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
     }
 
     let data: any = {}
@@ -268,6 +276,10 @@ export async function PATCH(request: Request) {
     const userCheck = await getCurrentUser(request);
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status });
+    }
+
+    if (!userCheck.user) {
+      return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
     }
 
     const { id, estado, respuesta, solicitudId } = await request.json();

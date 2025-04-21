@@ -11,6 +11,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
+    if (!userCheck.user) {
+      return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
+    }
+
     if (userCheck.user.role !== "admin") {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 })
     }
@@ -83,11 +87,11 @@ export async function GET(request: Request) {
       goceRemuneraciones: s.goce_remuneraciones,
       comentarios: s.comentarios,
       rutaAdjunto: s.archivo_url,
-      contratoUrl: s.usuarios?.contrato_url,  // Asegúrate de incluir el contrato URL
+      contratoUrl: s.usuarios?.[0]?.contrato_url,  // <-- Corregido
       usuario: {
         id: s.usuario_id,
-        nombre: s.usuarios?.nombre,
-        departamento: s.usuarios?.departamento,
+        nombre: s.usuarios?.[0]?.nombre,           // <-- Corregido
+        departamento: s.usuarios?.[0]?.departamento, // <-- Corregido
       }
     }))
     

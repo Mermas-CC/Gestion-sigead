@@ -115,7 +115,7 @@ function formatearFecha(fechaStr: string): string {
   });
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: { params: any }) {
   try {
     // Importar cookies dinámicamente y obtener cookieStore dentro del contexto de la solicitud
     const { cookies } = await import('next/headers')
@@ -127,7 +127,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
-    const id = params.id
+    const id = context.params.id
 
     // Consulta base para obtener la solicitud con Supabase
     const { data, error } = await supabase
@@ -146,7 +146,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const solicitud = {
       ...data,
-      usuario_nombre: data.usuarios?.nombre,
+      usuario_nombre: data.usuarios?.[0]?.nombre, // <-- Corregido
       motivo: data.descripcion,
       fecha_solicitud: data.created_at,
       fecha_actualizacion: data.updated_at
@@ -199,7 +199,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: any }) {
   try {
     // Importar cookies dinámicamente y obtener cookieStore dentro del contexto de la solicitud
     const { cookies } = await import('next/headers')
@@ -211,7 +211,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: adminCheck.message }, { status: adminCheck.status })
     }
 
-    const id = params.id
+    const id = context.params.id
     const { estado, comentarios } = await request.json()
 
     // Validar estado
@@ -262,7 +262,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         if (!solicitudCompletaError && solicitudCompleta) {
           const s = {
             ...solicitudCompleta,
-            usuario_nombre: solicitudCompleta.usuarios?.nombre,
+            usuario_nombre: solicitudCompleta.usuarios?.[0]?.nombre, // <-- Corregido
             motivo: solicitudCompleta.descripcion
           };
           const pdfBytes = await generarMemorandoPDF(s);

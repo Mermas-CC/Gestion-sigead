@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
-import bcrypt from "bcryptjs"
+
 import jwt from "jsonwebtoken"
 
 // En una implementación real, hashearías la contraseña con bcrypt

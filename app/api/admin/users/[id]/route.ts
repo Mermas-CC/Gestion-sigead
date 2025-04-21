@@ -4,8 +4,8 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 // GET: Obtener un usuario por ID
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { id } = await context.params;
+export async function GET(request: Request, context: { params: any }) {
+  const { id } = context.params;
   try {
     // Buscar usuario con Supabase
     const { data, error } = await supabase
@@ -25,8 +25,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 }
 
 // PATCH: Editar usuario
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { id } = await context.params;
+export async function PATCH(request: Request, context: { params: any }) {
+  const { id } = context.params;
   try {
     const formData = await request.formData();
 
@@ -106,8 +106,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 }
 
 // DELETE: Eliminar usuario
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { id } = await context.params;
+export async function DELETE(request: Request, context: { params: any }) {
+  const { id } = context.params;
   try {
     // Eliminar usuario con Supabase
     const { error } = await supabase

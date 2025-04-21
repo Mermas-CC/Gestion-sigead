@@ -85,7 +85,7 @@ export default function SolicitudesAdminPage() {
   const getBadgeVariant = (estado: string) => {
     switch (estado) {
       case "aprobada":
-        return "success"
+        return "outline" // Cambiado de "success" a "outline"
       case "rechazada":
         return "destructive"
       default:

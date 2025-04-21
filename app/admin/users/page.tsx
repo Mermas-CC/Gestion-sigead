@@ -163,7 +163,10 @@ export default function UsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.activo ? "success" : "destructive"}>
+                    <Badge
+                      variant={user.activo ? "outline" : "destructive"}
+                      className={user.activo ? "bg-green-100 text-green-800" : ""}
+                    >
                       {user.activo ? "Activo" : "Inactivo"}
                     </Badge>
                   </TableCell>

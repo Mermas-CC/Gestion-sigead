@@ -1,50 +1,34 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
+import fs from "fs/promises"
+import path from "path"
+import { notFound } from "next/navigation"
 
-export default function SolicitudJsonPage({ params }: { params: { id: string } }) {
-  const router = useRouter()
-  const [jsonData, setJsonData] = useState<any>(null)
-  const [error, setError] = useState("")
+export default async function SolicitudJsonPage(props: any) {
+  const { id } = props.params
 
-  useEffect(() => {
-    const fetchJson = async () => {
-      try {
-        const response = await fetch(`/json/solicitud_${params.id}.json`)
-        if (!response.ok) {
-          throw new Error("No se pudo cargar el archivo JSON")
-        }
-        const data = await response.json()
-        setJsonData(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Error al cargar el archivo JSON")
-      }
-    }
+  const filePath = path.join(process.cwd(), "public", "json", `solicitud_${id}.json`)
 
-    fetchJson()
-  }, [params.id])
+  try {
+    const fileContent = await fs.readFile(filePath, "utf-8")
+    const jsonData = JSON.parse(fileContent)
 
-  if (error) {
-    return <div className="p-4 text-red-500">{error}</div>
+    return (
+      <div className="container py-8">
+        <Link href="/admin/solicitudes">
+          <Button variant="ghost" className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver
+          </Button>
+        </Link>
+        <h1 className="text-2xl font-bold mb-4">Datos de la Solicitud</h1>
+        <pre className="bg-gray-100 p-4 rounded-md overflow-auto">
+          {JSON.stringify(jsonData, null, 2)}
+        </pre>
+      </div>
+    )
+  } catch (error) {
+    notFound()
   }
-
-  if (!jsonData) {
-    return <div className="p-4">Cargando datos...</div>
-  }
-
-  return (
-    <div className="container py-8">
-      <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Volver
-      </Button>
-      <h1 className="text-2xl font-bold mb-4">Datos de la Solicitud</h1>
-      <pre className="bg-gray-100 p-4 rounded-md overflow-auto">
-        {JSON.stringify(jsonData, null, 2)}
-      </pre>
-    </div>
-  )
 }

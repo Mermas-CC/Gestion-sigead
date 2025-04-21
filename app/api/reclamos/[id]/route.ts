@@ -134,15 +134,14 @@ async function generarMemorandoPDF({
   return await pdfDoc.save()
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: { params: any }) {
   try {
     const userCheck = await getCurrentUser(request)
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
-
-    const { id } = params
+    const { id } = context.params
     // Obtener reclamo con Supabase
     const { data, error } = await supabase
       .from('reclamos')
@@ -171,14 +170,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: Request, context: { params: any }) {
   try {
     const userCheck = await getCurrentUser(request)
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
-    const { id } = await context.params
+    const { id } = context.params
     const data = await request.json()
 
     // Campos válidos para actualizar

@@ -14,6 +14,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
 
+    if (!userCheck.user) {
+      return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
+    }
+
     if (userCheck.user.role !== "admin") {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 })
     }
@@ -42,12 +46,16 @@ export async function GET(request: Request) {
 }
 
 // PATCH: Actualizar estado de una solicitud y generar PDF si es aprobada
-export async function PATCH(request: Request, context: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: any }) {
   try {
     const { params } = context
     const userCheck = await getCurrentUser(request)
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
+    }
+
+    if (!userCheck.user) {
+      return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 })
     }
 
     if (userCheck.user.role !== "admin") {
