@@ -117,8 +117,12 @@ function formatearFecha(fechaStr: string): string {
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    // Verificar usuario autenticado
-    const userCheck = await getCurrentUser(request)
+    // Importar cookies dinámicamente y obtener cookieStore dentro del contexto de la solicitud
+    const { cookies } = await import('next/headers')
+    const cookieStore = cookies()
+    
+    // Verificar usuario autenticado, pasando cookieStore
+    const userCheck = await getCurrentUser(request, cookieStore)
     if (!userCheck.success) {
       return NextResponse.json({ message: userCheck.message }, { status: userCheck.status })
     }
@@ -197,8 +201,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
+    // Importar cookies dinámicamente y obtener cookieStore dentro del contexto de la solicitud
+    const { cookies } = await import('next/headers')
+    const cookieStore = cookies()
+    
     // Solo los administradores pueden actualizar el estado de las solicitudes
-    const adminCheck = await verifyAdmin(request)
+    const adminCheck = await verifyAdmin(request, cookieStore)
     if (!adminCheck.success) {
       return NextResponse.json({ message: adminCheck.message }, { status: adminCheck.status })
     }

@@ -1,17 +1,21 @@
-import { supabaseServer } from "@/lib/supabase"
+import { createAnonymousClient } from "@/lib/supabase/server"
+
+// Create a single instance of the anonymous client for all statistics operations
+// This doesn't use cookies, so it's safe to use during build time
+const supabase = createAnonymousClient()
 
 export async function obtenerEstadisticasGenerales() {
   try {
 
     // Total de solicitudes
-    const { count: totalSolicitudes, error: errorTotal } = await supabaseServer
+    const { count: totalSolicitudes, error: errorTotal } = await supabase
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
 
     if (errorTotal) throw errorTotal
 
     // Solicitudes pendientes
-    const { count: pendientes, error: errorPendientes } = await supabaseServer
+    const { count: pendientes, error: errorPendientes } = await supabase
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("estado", "pendiente")
@@ -19,7 +23,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorPendientes) throw errorPendientes
 
     // Solicitudes aprobadas
-    const { count: aprobadas, error: errorAprobadas } = await supabaseServer
+    const { count: aprobadas, error: errorAprobadas } = await supabase
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("estado", "aprobada")
@@ -27,7 +31,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorAprobadas) throw errorAprobadas
 
     // Solicitudes rechazadas
-    const { count: rechazadas, error: errorRechazadas } = await supabaseServer
+    const { count: rechazadas, error: errorRechazadas } = await supabase
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("estado", "rechazada")
@@ -35,7 +39,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorRechazadas) throw errorRechazadas
 
     // Solicitudes con goce
-    const { count: conGoce, error: errorConGoce } = await supabaseServer
+    const { count: conGoce, error: errorConGoce } = await supabase
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("goce_remuneraciones", true)
@@ -43,7 +47,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorConGoce) throw errorConGoce
 
     // Solicitudes sin goce
-    const { count: sinGoce, error: errorSinGoce } = await supabaseServer
+    const { count: sinGoce, error: errorSinGoce } = await supabase
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("goce_remuneraciones", false)
@@ -66,7 +70,7 @@ export async function obtenerEstadisticasGenerales() {
 
 export async function obtenerDatosPorTipoLicencia() {
   try {
-    const { data, error } = await supabaseServer.from("solicitudes").select("tipo, goce_remuneraciones")
+    const { data, error } = await supabase.from("solicitudes").select("tipo, goce_remuneraciones")
 
     if (error) throw error
 
@@ -109,7 +113,7 @@ export async function obtenerDatosPorTipoLicencia() {
 
 export async function obtenerDatosPorEstado() {
   try {
-    const { data, error } = await supabaseServer.from("solicitudes").select("estado")
+    const { data, error } = await supabase.from("solicitudes").select("estado")
 
     if (error) throw error
 
@@ -145,7 +149,7 @@ export async function obtenerDatosPorEstado() {
 
 export async function obtenerDatosPorMes() {
   try {
-    const { data, error } = await supabaseServer.from("solicitudes").select("created_at, goce_remuneraciones")
+    const { data, error } = await supabase.from("solicitudes").select("created_at, goce_remuneraciones")
 
     if (error) throw error
 

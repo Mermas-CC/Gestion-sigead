@@ -1,20 +1,39 @@
-import { cookies } from "next/headers"
+import type { ReadonlyRequestCookies } from "next/headers"
 import jwt from "jsonwebtoken"
 import { supabase } from "./supabaseClient"
 
-// Verificar token JWT
-export async function verifyToken(request: Request) {
+/**
+ * Verificar token JWT
+ * @param request - La solicitud HTTP
+ * @param cookieStore - Store de cookies pasado desde el contexto de la ruta API
+ * 
+ * IMPORTANTE: Para usar esta función en API routes, siempre pasa el cookieStore:
+ * ```
+ * import { cookies } from 'next/headers'
+ * 
+ * export async function GET(request) {
+ *   const cookieStore = cookies()
+ *   const auth = await verifyToken(request, cookieStore)
+ *   // ...
+ * }
+ * ```
+ */
+export async function verifyToken(request: Request, cookieStore?: ReadonlyRequestCookies) {
   try {
     // Obtener token de las cookies o del header Authorization
     let token: string | undefined
 
-    // Primero intentar obtener de las cookies
-    const cookieStore = await cookies()
-    console.log('All cookies:', cookieStore.getAll())
-    
-    const authCookie = cookieStore.get("auth_token")
-    console.log('Auth cookie:', authCookie)
-    token = authCookie?.value
+    // Primero intentar obtener de las cookies si tenemos acceso a ellas
+    if (cookieStore) {
+      console.log('Using provided cookieStore')
+      console.log('All cookies:', cookieStore.getAll())
+      
+      const authCookie = cookieStore.get("auth_token")
+      console.log('Auth cookie:', authCookie)
+      token = authCookie?.value
+    } else {
+      console.log('No cookieStore provided, skipping cookie check')
+    }
 
     // Si no hay token en las cookies, intentar obtener del header Authorization
     if (!token) {
@@ -53,9 +72,13 @@ export async function verifyToken(request: Request) {
   }
 }
 
-// Verificar si el usuario es administrador
-export async function verifyAdmin(request: Request) {
-  const tokenCheck = await verifyToken(request)
+/**
+ * Verificar si el usuario es administrador
+ * @param request - La solicitud HTTP
+ * @param cookieStore - Store de cookies pasado desde el contexto de la ruta API
+ */
+export async function verifyAdmin(request: Request, cookieStore?: ReadonlyRequestCookies) {
+  const tokenCheck = await verifyToken(request, cookieStore)
 
   if (!tokenCheck.success) {
     return tokenCheck
@@ -70,9 +93,13 @@ export async function verifyAdmin(request: Request) {
   return tokenCheck
 }
 
-// Obtener usuario actual
-export async function getCurrentUser(request: Request) {
-  const tokenCheck = await verifyToken(request)
+/**
+ * Obtener usuario actual
+ * @param request - La solicitud HTTP
+ * @param cookieStore - Store de cookies pasado desde el contexto de la ruta API
+ */
+export async function getCurrentUser(request: Request, cookieStore?: ReadonlyRequestCookies) {
+  const tokenCheck = await verifyToken(request, cookieStore)
 
   if (!tokenCheck.success) {
     return { success: false, message: tokenCheck.message, status: tokenCheck.status }
