@@ -6,11 +6,17 @@ import {
   obtenerDatosPorEstado,
   obtenerDatosPorMes,
 } from "@/lib/services/estadisticas-service"
+// No importar cookies en el nivel superior
 
 export async function GET(request: Request) {
   try {
-    // Verificar que el usuario es administrador
-    const adminCheck = await verifyAdmin(request)
+    // Importar cookies dentro del manejador de solicitud
+    const { cookies } = await import("next/headers")
+    // Obtener cookieStore dentro del contexto de la solicitud
+    const cookieStore = cookies()
+    
+    // Verificar que el usuario es administrador, pasando cookieStore
+    const adminCheck = await verifyAdmin(request, cookieStore)
     if (!adminCheck.success) {
       return NextResponse.json({ message: adminCheck.message }, { status: adminCheck.status })
     }

@@ -1,41 +1,56 @@
-import { cookies } from "next/headers"
+import type { ReadonlyRequestCookies } from "next/headers"
 import jwt from "jsonwebtoken"
 import { supabase } from "./supabaseClient"
 
-// Verificar token JWT
-export async function verifyToken(request: Request) {
+/**
+ * Verificar token JWT
+ * @param request - La solicitud HTTP
+ * @param cookieStore - Store de cookies pasado desde el contexto de la ruta API
+ * 
+ * IMPORTANTE: Para usar esta función en API routes, siempre pasa el cookieStore:
+ * ```
+ * import { cookies } from 'next/headers'
+ * 
+ * export async function GET(request) {
+ *   const cookieStore = cookies()
+ *   const auth = await verifyToken(request, cookieStore)
+ *   // ...
+ * }
+ * ```
+ */
+export async function verifyToken(request: Request, cookieStore?: ReadonlyRequestCookies) {
   try {
-    // Obtener token del header Authorization o de las cookies
+    // Obtener token de las cookies o del header Authorization
     let token: string | undefined
 
-    // Primero intentar obtener del header Authorization
-    const authHeader = request.headers.get("Authorization")
-    console.log('Authorization header:', authHeader)
-    if (authHeader?.startsWith("Bearer ")) {
-      token = authHeader.split(" ")[1]
+    // Primero intentar obtener de las cookies si tenemos acceso a ellas
+    if (cookieStore) {
+      console.log('Using provided cookieStore')
+      console.log('All cookies:', cookieStore.getAll())
+      
+      const authCookie = cookieStore.get("auth_token")
+      console.log('Auth cookie:', authCookie)
+      token = authCookie?.value
+    } else {
+      console.log('No cookieStore provided, skipping cookie check')
     }
 
-    // Si no hay token en el header, intentar obtener de las cookies
+    // Si no hay token en las cookies, intentar obtener del header Authorization
     if (!token) {
-      console.log('No token in Authorization header, checking cookies')
-      try {
-        const cookieStore = cookies()
-        const authCookie = cookieStore.get("auth_token")
-        console.log('Auth cookie:', authCookie)
-        token = authCookie?.value
-      } catch (cookieError) {
-        console.error('Error accessing cookies:', cookieError)
-        // Continue without cookie - we might be in a context where cookies are not available
+      console.log('No token in cookies, checking Authorization header')
+      const authHeader = request.headers.get("Authorization")
+      console.log('Authorization header:', authHeader)
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1]
       }
     }
-
     console.log('Final token found:', token ? 'yes' : 'no')
 
     if (!token) {
       return { success: false, message: "No autorizado", status: 401 }
     }
 
-    // Verificar token
+    // Verificar token JWT
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_fallback") as jwt.JwtPayload
       console.log('Decoded token:', decoded)
@@ -56,9 +71,13 @@ export async function verifyToken(request: Request) {
   }
 }
 
-// Verificar si el usuario es administrador
-export async function verifyAdmin(request: Request) {
-  const tokenCheck = await verifyToken(request)
+/**
+ * Verificar si el usuario es administrador
+ * @param request - La solicitud HTTP
+ * @param cookieStore - Store de cookies pasado desde el contexto de la ruta API
+ */
+export async function verifyAdmin(request: Request, cookieStore?: ReadonlyRequestCookies) {
+  const tokenCheck = await verifyToken(request, cookieStore)
 
   if (!tokenCheck.success) {
     return tokenCheck
@@ -73,9 +92,13 @@ export async function verifyAdmin(request: Request) {
   return tokenCheck
 }
 
-// Obtener usuario actual
-export async function getCurrentUser(request: Request) {
-  const tokenCheck = await verifyToken(request)
+/**
+ * Obtener usuario actual
+ * @param request - La solicitud HTTP
+ * @param cookieStore - Store de cookies pasado desde el contexto de la ruta API
+ */
+export async function getCurrentUser(request: Request, cookieStore?: ReadonlyRequestCookies) {
+  const tokenCheck = await verifyToken(request, cookieStore)
 
   if (!tokenCheck.success) {
     return { success: false, message: tokenCheck.message, status: tokenCheck.status }

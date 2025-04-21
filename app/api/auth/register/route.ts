@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
-import { supabaseServer } from "@/lib/supabase"
+import { createServerClient } from "@/lib/supabase/server"
+import bcrypt from "bcryptjs"
+import jwt from "jsonwebtoken"
 
 // En una implementación real, hashearías la contraseña con bcrypt
 export async function POST(request: Request) {
@@ -12,12 +14,15 @@ export async function POST(request: Request) {
     }
 
     // Verificar si el email ya existe
-    const { data: existingUser, error: existingUserError } = await supabaseServer
+    // Crear cliente de Supabase dentro del contexto de la solicitud
+    const supabase = await createServerClient()
+    
+    // Verificar si el email ya existe
+    const { data: existingUser, error: existingUserError } = await supabase
       .from("usuarios")
       .select("id")
       .eq("email", email)
       .single()
-
     if (existingUserError && existingUserError.code !== 'PGRST116') {
       console.error("Error al verificar usuario existente:", existingUserError)
       return NextResponse.json({ message: "Error al verificar registro" }, { status: 500 })
@@ -28,9 +33,9 @@ export async function POST(request: Request) {
     }
 
     // Insertar nuevo usuario
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("usuarios")
-      .insert([{ 
+      .insert([{
         nombre: name, 
         email, 
         password, // En producción, hashear la contraseña
@@ -49,8 +54,36 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
 
-    return NextResponse.json(
+    // Generar token JWT para el usuario registrado
+    const token = jwt.sign(
       {
+        id: data.id,
+        email: data.email,
+        role: data.rol
+      },
+      process.env.JWT_SECRET || "secret_fallback",
+      { expiresIn: "7d" }
+    );
+
+    // Crear headers con cookie
+    const headers = new Headers();
+    headers.append('Content-Type', 'application/json');
+    
+    // Establecer cookie de autenticación utilizando Set-Cookie header
+    const isSecure = process.env.NODE_ENV === 'production';
+    const maxAge = 60 * 60 * 24 * 7; // 7 días
+    
+    headers.append(
+      'Set-Cookie', 
+      `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${isSecure ? '; Secure' : ''}`
+    );
+    
+    console.log('Setting cookie with token:', token);
+    console.log('Headers:', headers.get('Set-Cookie'));
+
+    // Crear respuesta con los headers que incluyen la cookie
+    return new NextResponse(
+      JSON.stringify({
         user: {
           id: data.id,
           name: data.nombre,
@@ -58,8 +91,11 @@ export async function POST(request: Request) {
           role: data.rol,
         },
         message: "Usuario registrado exitosamente",
-      },
-      { status: 201 },
+      }),
+      {
+        status: 201,
+        headers: headers
+      }
     )
   } catch (error) {
     console.error("Error en registro:", error)
