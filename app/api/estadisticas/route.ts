@@ -31,6 +31,9 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("Error al obtener estadísticas:", error)
-    return NextResponse.json({ message: "Error al obtener estadísticas" }, { status: 500 })
+    return NextResponse.json({ 
+      message: "Error al obtener estadísticas",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    }, { status: 500 })
   }
 }

@@ -1,18 +1,17 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { supabaseServer } from "@/lib/supabase"
 
 export async function obtenerEstadisticasGenerales() {
   try {
-    const supabase = createServerClient()
 
     // Total de solicitudes
-    const { count: totalSolicitudes, error: errorTotal } = await supabase
+    const { count: totalSolicitudes, error: errorTotal } = await supabaseServer
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
 
     if (errorTotal) throw errorTotal
 
     // Solicitudes pendientes
-    const { count: pendientes, error: errorPendientes } = await supabase
+    const { count: pendientes, error: errorPendientes } = await supabaseServer
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("estado", "pendiente")
@@ -20,7 +19,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorPendientes) throw errorPendientes
 
     // Solicitudes aprobadas
-    const { count: aprobadas, error: errorAprobadas } = await supabase
+    const { count: aprobadas, error: errorAprobadas } = await supabaseServer
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("estado", "aprobada")
@@ -28,7 +27,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorAprobadas) throw errorAprobadas
 
     // Solicitudes rechazadas
-    const { count: rechazadas, error: errorRechazadas } = await supabase
+    const { count: rechazadas, error: errorRechazadas } = await supabaseServer
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("estado", "rechazada")
@@ -36,7 +35,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorRechazadas) throw errorRechazadas
 
     // Solicitudes con goce
-    const { count: conGoce, error: errorConGoce } = await supabase
+    const { count: conGoce, error: errorConGoce } = await supabaseServer
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("goce_remuneraciones", true)
@@ -44,7 +43,7 @@ export async function obtenerEstadisticasGenerales() {
     if (errorConGoce) throw errorConGoce
 
     // Solicitudes sin goce
-    const { count: sinGoce, error: errorSinGoce } = await supabase
+    const { count: sinGoce, error: errorSinGoce } = await supabaseServer
       .from("solicitudes")
       .select("*", { count: "exact", head: true })
       .eq("goce_remuneraciones", false)
@@ -67,9 +66,7 @@ export async function obtenerEstadisticasGenerales() {
 
 export async function obtenerDatosPorTipoLicencia() {
   try {
-    const supabase = createServerClient()
-
-    const { data, error } = await supabase.from("solicitudes").select("tipo_licencia, goce_remuneraciones")
+    const { data, error } = await supabaseServer.from("solicitudes").select("tipo, goce_remuneraciones")
 
     if (error) throw error
 
@@ -77,7 +74,7 @@ export async function obtenerDatosPorTipoLicencia() {
     const tiposLicencia: Record<string, number> = {}
 
     data.forEach((solicitud) => {
-      const tipo = solicitud.tipo_licencia || "sin_especificar"
+      const tipo = solicitud.tipo || "sin_especificar"
       tiposLicencia[tipo] = (tiposLicencia[tipo] || 0) + 1
     })
 
@@ -112,9 +109,7 @@ export async function obtenerDatosPorTipoLicencia() {
 
 export async function obtenerDatosPorEstado() {
   try {
-    const supabase = createServerClient()
-
-    const { data, error } = await supabase.from("solicitudes").select("estado")
+    const { data, error } = await supabaseServer.from("solicitudes").select("estado")
 
     if (error) throw error
 
@@ -150,9 +145,7 @@ export async function obtenerDatosPorEstado() {
 
 export async function obtenerDatosPorMes() {
   try {
-    const supabase = createServerClient()
-
-    const { data, error } = await supabase.from("solicitudes").select("fecha_solicitud, goce_remuneraciones")
+    const { data, error } = await supabaseServer.from("solicitudes").select("created_at, goce_remuneraciones")
 
     if (error) throw error
 
@@ -160,7 +153,7 @@ export async function obtenerDatosPorMes() {
     const meses: Record<string, { conGoce: number; sinGoce: number }> = {}
 
     data.forEach((solicitud) => {
-      const fecha = new Date(solicitud.fecha_solicitud)
+      const fecha = new Date(solicitud.created_at)
       const mes = fecha.toLocaleString("es-ES", { month: "short" })
 
       if (!meses[mes]) {
